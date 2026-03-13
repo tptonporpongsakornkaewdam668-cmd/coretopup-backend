@@ -67,7 +67,13 @@ app.use("/api/history", historyRoutes);
 app.use("/api/wepay-game", wepayRoutes);
 
 // Serve Static Admin Panel
-app.use("/admin", express.static(path.join(__dirname, "public/admin")));
+const adminPath = path.join(__dirname, "public", "admin");
+app.use("/admin", express.static(adminPath));
+
+// Fallback for /admin to serve index.html (Handles cases without trailing slash)
+app.get("/admin/*", (req, res) => {
+  res.sendFile(path.join(adminPath, "index.html"));
+});
 
 // Base API route
 app.get("/", (req, res) => {
