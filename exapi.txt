@@ -1,0 +1,1403 @@
+ตรวจสอบสลิปด้วย QR-Code
+
+Req
+รายละเอียด Request
+
+Res
+รายละเอียด Response
+
+ตัวอย่างการใช้งาน
+POST
+Endpoint:
+/api/verify-slip/qr-code/info
+Auth Required
+วิธีการใช้งาน
+จะต้องระบุ API Secret มากับ Header ทุกครั้ง ที่เรียกใช้งาน API*ดูวิธีใช้งานได้ที่หน้า Authentication
+สามารถระบุ IP Whitelist เพื่อกำหนดการเข้าถึง API จาก IP ที่กำหนดได้
+หากต้องการตรวจสอบเงื่อนไขสลิป ให้ส่งข้อมูลเฉพาะ Key ที่ต้องการตรวจสอบเท่านั้น*ดูวิธีใช้งานที่หน้า ตัวอย่างการใช้งาน
+Request Body (JSON)
+key
+Type
+Description
+Example
+Required
+payload
+Object
+Object ข้อมูลทั้งหมด
+{ payload: { ... } }
+payload.qrCode
+String
+รหัส QR Code
+"0041000600000101030040220014242082547BPM049885102TH9104xxxx"
+payload.checkCondition
+Object
+Object ข้อมูลที่ต้องการตรวจสอบเงื่อนไข
+*ระบุหากต้องการตรวจสอบเงื่อนไขเพิ่มเติม
+{ ... }
+payload.checkCondition.checkDuplicate
+Boolean
+Flag สำหรับตรวจสอบสลิปซ้ำ
+*ระบุหากต้องการตรวจสอบสลิปซ้ำ
+true | false
+payload.checkCondition.checkReceiver
+Array
+Array การตรวจสอบบัญชีผู้รับ
+*ระบุได้มากกว่า 1 Object เพื่อตรวจสอบหลายเงื่อนไขในคราวเดียว
+*หากข้อมูลตรงกับเงื่อนไขอย่างน้อย 1 เงื่อนไขจะถือว่าสลิปถูกต้อง
+[{ receiver1 }, { receiever2 }, ...]
+payload.checkCondition.checkReceiver.accountType
+String
+ตรวจสอบประเภทบัญชี
+*ระบุหากต้องการตรวจสอบประเภทบัญชี
+"01002" = ธนาคาร...
+payload.checkCondition.checkReceiver.accountNameTH
+String
+ชื่อบัญชีผู้รับภาษาไทย
+*ระบุหากต้องการตรวจสอบชื่อบัญชีภาษาไทย
+"สมชาย สลิปทูโก"
+*ห้ามใส่คำนำหน้า
+payload.checkCondition.checkReceiver.accountNameEN
+String
+ชื่อบัญชีผู้รับภาษาอังกฤษ
+*ระบุหากต้องการตรวจสอบชื่อบัญชีภาษาอังกฤษ
+"Somchay Slip2go"
+*ห้ามใส่คำนำหน้า
+payload.checkCondition.checkReceiver.accountNumber
+String
+เลขที่บัญชี
+*ระบุหากต้องการตรวจสอบเลขที่บัญชี
+"xxxxxx1234"
+*ห้ามเว้นวรรคหรือใส่สัญลักษณ์
+payload.checkCondition.checkAmount
+Object
+Object การตรวจสอบจำนวนเงิน
+*ระบุหากต้องการตรวจสอบจำนวนเงินโอน
+{ ... }
+payload.checkCondition.checkAmount.type
+String
+รูปแบบการตรวจสอบจำนวนเงิน
+*ระบุรูปแบบการตรวจสอบ
+"lte" = น้อยกว่าหรือเท่ากับ
+"eq" = เท่ากับ
+"gte" = มากกว่าหรือเท่ากับ
+*หากไม่ระบุจะมีค่าเท่ากับ "eq"
+payload.checkCondition.checkAmount.amount
+String
+จำนวนเงิน
+*ระบุจำนวนเงินที่ต้องการตรวจสอบ
+"10000"
+*ห้ามใส่ 0 และลูกน้ำ
+payload.checkCondition.checkDate
+Object
+Object การตรวจสอบวันที่โอน
+*ระบุหากต้องการตรวจสอบวันที่โอน
+{ ... }
+payload.checkCondition.checkDate.type
+String
+รูปแบบการตรวจสอบวันที่
+*ระบุรูปแบบการตรวจสอบ
+"lte" = น้อยกว่าหรือเท่ากับ
+"eq" = เท่ากับ
+"gte" = มากกว่าหรือเท่ากับ
+*หากไม่ระบุจะมีค่าเท่ากับ "eq"
+payload.checkCondition.checkDate.date
+DateISO
+วันที่โอน
+*ระบุวันที่โอน
+"2025-10-05T14:48:00.000Z"
+*ระบุเป็นเวลา GMT
+
+คัดลอก
+{
+  "payload": {
+    "qrCode": "xxx-xxxx-xxxxxx"
+  }
+}
+ตรวจสอบสลิปด้วย QR-Code
+
+Req
+รายละเอียด Request
+
+Res
+รายละเอียด Response
+
+ตัวอย่างการใช้งาน
+POST
+Endpoint:
+/api/verify-slip/qr-code/info
+Auth Required
+รายละเอียด Response
+key
+Type
+Description
+Example
+code
+String
+รหัสผลลัพธ์ของการทำรายการ
+"200000"
+message
+String
+ข้อความผลลัพธ์ของการทำรายการ
+"Slip found"
+data
+Object | undefined
+ผลลัพธ์ข้อมูลทั้งหมด
+{ ... }
+data.referenceId
+String
+รหัสอ้างอิงสลิป
+"92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",
+data.decode
+String
+รหัสอ้างอิง QR Code
+"0041000600000101030040220014242082547BPM049885102TH9104xxxx",
+data.transRef
+String
+รหัสอ้างอิงของข้อมูลชุดนี้
+"015073144041ATF00999",
+data.dateTime
+String
+วันที่โอน
+"2025-10-05T14:48:00.000Z",
+data.amount
+Number
+จำนวนเงินที่โอน
+1
+data.ref1
+String | NULL
+รหัสอ้างอิง 1
+"xxx" | null
+data.ref2
+String | NULL
+รหัสอ้างอิง 2
+"xxx" | null
+data.ref3
+String | NULL
+รหัสอ้างอิง 3
+"xxx" | null
+data.receiver
+Object
+ข้อมูลผู้รับ
+{ ... }
+data.receiver.account
+Object
+ข้อมูลบัญชีผู้รับ
+{ ... }
+data.receiver.account.name
+String
+ชื่อบัญชีผู้รับ
+"บริษัท สลิปทูโก จำกัด"
+data.receiver.account.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.account.bank.account
+String | NULL
+เลขบัญชีธนาคารผู้รับ
+"xxx-x-x5366-x"
+data.receiver.account.proxy
+Object | NULL
+ข้อมูลตัวแทนบัญชีผู้รับ
+{ ... } | null
+data.receiver.account.proxy.type
+String | NULL
+NATID, MSISDN, EWALLTID, EMAIL, BILLERID
+"NATID"
+data.receiver.account.proxy.account
+String | NULL
+เลขตัวแทนบัญชีผู้รับ
+"xxx-x-x5366-x"
+data.receiver.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.bank.id
+String
+เลขธนาคารผู้รับ
+"004"
+data.receiver.bank.name
+String | NULL
+ชื่อธนาคารผู้รับ
+"ธนาคารกสิกรไทย"
+data.sender
+Object
+ข้อมูลผู้ส่ง
+{ ... }
+data.sender.account
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.name
+String
+ชื่อผู้ส่ง
+"บริษัท สลิปทูโก จำกัด",
+data.sender.account.bank
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.bank.account
+String
+เลขที่บัญชีผู้ส่ง
+"xxx-x-x9866-x"
+data.sender.bank
+Object
+ข้อมูลธนาคารผู้ส่ง
+{ ... }
+data.sender.bank.id
+String
+เลขธนาคารผู้ส่ง
+"004"
+data.sender.bank.name
+String | NULL
+ชื่อธนาคารผู้ส่ง
+"ธนาคารกสิกรไทย"
+ตัวอย่าง Request Body (JSON)
+
+คัดลอก
+{
+    "code": "200000",
+    "message": "Slip found",
+    "data": {
+      "referenceId": "92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",
+      "decode": "0041000600000101030040220014242082547BPM049885102TH9104xxxx",
+      "transRef": "015073144041ATF00999",
+      "dateTime": "2025-10-05T14:48:00.000Z",
+      "amount": 1,
+      "ref1": null,
+      "ref2": null,
+      "ref3": null,
+      "receiver": {
+        "account": {
+          "name": "บริษัท สลิปทูโก จำกัด",
+          "bank": {
+            "account": "xxx-x-x5366-x"
+          },
+          "proxy": {
+            "type": "NATID",
+            "account": "xxx-x-x5366-x"
+          }
+        },
+        "bank": {
+          "id": "004",
+          "name": "ธนาคารกสิกรไทย"
+        }
+      },
+    "sender": {
+      "account": {
+        "name": "บริษัท สลิปทูโก จำกัด",
+        "bank": {
+          "account": "xxx-x-x9866-x"
+        }
+      },
+      "bank": {
+        "id": "004",
+        "name": "ธนาคารกสิกรไทย"
+      }
+    }
+  }
+}
+ตรวจสอบสลิปด้วย QR-Code
+
+Req
+รายละเอียด Request
+
+Res
+รายละเอียด Response
+
+ตัวอย่างการใช้งาน
+POST
+Endpoint:
+/api/verify-slip/qr-code/info
+Auth Required
+รายละเอียด Response
+key
+Type
+Description
+Example
+code
+String
+รหัสผลลัพธ์ของการทำรายการ
+"200000"
+message
+String
+ข้อความผลลัพธ์ของการทำรายการ
+"Slip found"
+data
+Object | undefined
+ผลลัพธ์ข้อมูลทั้งหมด
+{ ... }
+data.referenceId
+String
+รหัสอ้างอิงสลิป
+"92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",
+data.decode
+String
+รหัสอ้างอิง QR Code
+"0041000600000101030040220014242082547BPM049885102TH9104xxxx",
+data.transRef
+String
+รหัสอ้างอิงของข้อมูลชุดนี้
+"015073144041ATF00999",
+data.dateTime
+String
+วันที่โอน
+"2025-10-05T14:48:00.000Z",
+data.amount
+Number
+จำนวนเงินที่โอน
+1
+data.ref1
+String | NULL
+รหัสอ้างอิง 1
+"xxx" | null
+data.ref2
+String | NULL
+รหัสอ้างอิง 2
+"xxx" | null
+data.ref3
+String | NULL
+รหัสอ้างอิง 3
+"xxx" | null
+data.receiver
+Object
+ข้อมูลผู้รับ
+{ ... }
+data.receiver.account
+Object
+ข้อมูลบัญชีผู้รับ
+{ ... }
+data.receiver.account.name
+String
+ชื่อบัญชีผู้รับ
+"บริษัท สลิปทูโก จำกัด"
+data.receiver.account.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.account.bank.account
+String | NULL
+เลขบัญชีธนาคารผู้รับ
+"xxx-x-x5366-x"
+data.receiver.account.proxy
+Object | NULL
+ข้อมูลตัวแทนบัญชีผู้รับ
+{ ... } | null
+data.receiver.account.proxy.type
+String | NULL
+NATID, MSISDN, EWALLTID, EMAIL, BILLERID
+"NATID"
+data.receiver.account.proxy.account
+String | NULL
+เลขตัวแทนบัญชีผู้รับ
+"xxx-x-x5366-x"
+data.receiver.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.bank.id
+String
+เลขธนาคารผู้รับ
+"004"
+data.receiver.bank.name
+String | NULL
+ชื่อธนาคารผู้รับ
+"ธนาคารกสิกรไทย"
+data.sender
+Object
+ข้อมูลผู้ส่ง
+{ ... }
+data.sender.account
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.name
+String
+ชื่อผู้ส่ง
+"บริษัท สลิปทูโก จำกัด",
+data.sender.account.bank
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.bank.account
+String
+เลขที่บัญชีผู้ส่ง
+"xxx-x-x9866-x"
+data.sender.bank
+Object
+ข้อมูลธนาคารผู้ส่ง
+{ ... }
+data.sender.bank.id
+String
+เลขธนาคารผู้ส่ง
+"004"
+data.sender.bank.name
+String | NULL
+ชื่อธนาคารผู้ส่ง
+"ธนาคารกสิกรไทย"
+ตัวอย่าง Request Body (JSON)
+
+คัดลอก
+{
+    "code": "200000",
+    "message": "Slip found",
+    "data": {
+      "referenceId": "92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",
+      "decode": "0041000600000101030040220014242082547BPM049885102TH9104xxxx",
+      "transRef": "015073144041ATF00999",
+      "dateTime": "2025-10-05T14:48:00.000Z",
+      "amount": 1,
+      "ref1": null,
+      "ref2": null,
+      "ref3": null,
+      "receiver": {
+        "account": {
+          "name": "บริษัท สลิปทูโก จำกัด",
+          "bank": {
+            "account": "xxx-x-x5366-x"
+          },
+          "proxy": {
+            "type": "NATID",
+            "account": "xxx-x-x5366-x"
+          }
+        },
+        "bank": {
+          "id": "004",
+          "name": "ธนาคารกสิกรไทย"
+        }
+      },
+    "sender": {
+      "account": {
+        "name": "บริษัท สลิปทูโก จำกัด",
+        "bank": {
+          "account": "xxx-x-x9866-x"
+        }
+      },
+      "bank": {
+        "id": "004",
+        "name": "ธนาคารกสิกรไทย"
+      }
+    }
+  }
+}
+ตรวจสอบสลิปด้วยรูปภาพ
+
+Req
+รายละเอียด Request
+
+Res
+รายละเอียด Response
+
+ตัวอย่างการใช้งาน
+POST
+Endpoint:
+/api/verify-slip/qr-image/info
+Auth Required
+รายละเอียด Response
+key
+Type
+Description
+Example
+code
+String
+รหัสผลลัพธ์ของการทำรายการ
+"200000"
+message
+String
+ข้อความผลลัพธ์ของการทำรายการ
+"Slip found"
+data
+Object | undefined
+ผลลัพธ์ข้อมูลทั้งหมด
+{ ... }
+data.referenceId
+String
+รหัสอ้างอิงสลิป
+"92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",
+data.decode
+String
+รหัสอ้างอิง QR Code
+"0041000600000101030040220014242082547BPM049885102TH9104xxxx",
+data.transRef
+String
+รหัสอ้างอิงของข้อมูลชุดนี้
+"015073144041ATF00999",
+data.dateTime
+String
+วันที่โอน
+"2025-10-05T14:48:00.000Z",
+data.amount
+Number
+จำนวนเงินที่โอน
+1
+data.ref1
+String | NULL
+รหัสอ้างอิง 1
+"xxx" | null
+data.ref2
+String | NULL
+รหัสอ้างอิง 2
+"xxx" | null
+data.ref3
+String | NULL
+รหัสอ้างอิง 3
+"xxx" | null
+data.receiver
+Object
+ข้อมูลผู้รับ
+{ ... }
+data.receiver.account
+Object
+ข้อมูลบัญชีผู้รับ
+{ ... }
+data.receiver.account.name
+String
+ชื่อบัญชีผู้รับ
+"บริษัท สลิปทูโก จำกัด"
+data.receiver.account.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.account.bank.account
+String | NULL
+เลขบัญชีธนาคารผู้รับ
+"xxx-x-x5366-x"
+data.receiver.account.proxy
+Object | NULL
+ข้อมูลตัวแทนบัญชีผู้รับ
+{ ... } | null
+data.receiver.account.proxy.type
+String | NULL
+NATID, MSISDN, EWALLTID, EMAIL, BILLERID
+"NATID"
+data.receiver.account.proxy.account
+String | NULL
+เลขตัวแทนบัญชีผู้รับ
+"xxx-x-x5366-x"
+data.receiver.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.bank.id
+String
+เลขธนาคารผู้รับ
+"004"
+data.receiver.bank.name
+String | NULL
+ชื่อธนาคารผู้รับ
+"ธนาคารกสิกรไทย"
+data.sender
+Object
+ข้อมูลผู้ส่ง
+{ ... }
+data.sender.account
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.name
+String
+ชื่อผู้ส่ง
+"บริษัท สลิปทูโก จำกัด",
+data.sender.account.bank
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.bank.account
+String
+เลขที่บัญชีผู้ส่ง
+"xxx-x-x9866-x"
+data.sender.bank
+Object
+ข้อมูลธนาคารผู้ส่ง
+{ ... }
+data.sender.bank.id
+String
+เลขธนาคารผู้ส่ง
+"004"
+data.sender.bank.name
+String | NULL
+ชื่อธนาคารผู้ส่ง
+"ธนาคารกสิกรไทย"
+ตัวอย่าง Request Body (JSON)
+
+คัดลอก
+{    
+  "code": "200000",    
+  "message": "Slip found",    
+  "data": {        
+    "referenceId": "92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",        
+    "decode": "0041000600000101030040220014242082547BPM049885102TH9104xxxx",        
+    "transRef": "015073144041ATF00999",        
+    "dateTime": "2025-04-23T08:32:45.123Z",        
+    "amount": 1,        
+    "ref1": null,        
+    "ref2": null,        
+    "ref3": null,        
+    "receiver": {            
+    "account": {                
+      "name": "บริษัท สลิปทูโก จำกัด",                
+      "bank": {                    
+        "account": "xxx-x-x5366-x"                
+      },                
+      "proxy": {                   
+        "type": "NATID",                    
+        "account": "xxx-x-x5366-x"                
+      },            
+    },            
+    "bank": {               
+      "id": "004",                
+      "name": "ธนาคารกสิกรไทย"            
+    }        
+  },        
+  "sender": {            
+      "account": {                
+        "name": "บริษัท สลิปทูโก จำกัด",                
+        "bank": {                    
+          "account": "xxx-x-x9866-x"                
+        }            
+      },            
+      "bank": {                
+        "id": "004",                
+        "name": "ธนาคารกสิกรไทย"            
+      }        
+    },    
+  }
+}
+ตรวจสอบสลิปด้วยรูปภาพ
+
+Req
+รายละเอียด Request
+
+Res
+รายละเอียด Response
+
+ตัวอย่างการใช้งาน
+POST
+Endpoint:
+/api/verify-slip/qr-image/info
+Auth Required
+รายละเอียด Response
+key
+Type
+Description
+Example
+code
+String
+รหัสผลลัพธ์ของการทำรายการ
+"200000"
+message
+String
+ข้อความผลลัพธ์ของการทำรายการ
+"Slip found"
+data
+Object | undefined
+ผลลัพธ์ข้อมูลทั้งหมด
+{ ... }
+data.referenceId
+String
+รหัสอ้างอิงสลิป
+"92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",
+data.decode
+String
+รหัสอ้างอิง QR Code
+"0041000600000101030040220014242082547BPM049885102TH9104xxxx",
+data.transRef
+String
+รหัสอ้างอิงของข้อมูลชุดนี้
+"015073144041ATF00999",
+data.dateTime
+String
+วันที่โอน
+"2025-10-05T14:48:00.000Z",
+data.amount
+Number
+จำนวนเงินที่โอน
+1
+data.ref1
+String | NULL
+รหัสอ้างอิง 1
+"xxx" | null
+data.ref2
+String | NULL
+รหัสอ้างอิง 2
+"xxx" | null
+data.ref3
+String | NULL
+รหัสอ้างอิง 3
+"xxx" | null
+data.receiver
+Object
+ข้อมูลผู้รับ
+{ ... }
+data.receiver.account
+Object
+ข้อมูลบัญชีผู้รับ
+{ ... }
+data.receiver.account.name
+String
+ชื่อบัญชีผู้รับ
+"บริษัท สลิปทูโก จำกัด"
+data.receiver.account.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.account.bank.account
+String | NULL
+เลขบัญชีธนาคารผู้รับ
+"xxx-x-x5366-x"
+data.receiver.account.proxy
+Object | NULL
+ข้อมูลตัวแทนบัญชีผู้รับ
+{ ... } | null
+data.receiver.account.proxy.type
+String | NULL
+NATID, MSISDN, EWALLTID, EMAIL, BILLERID
+"NATID"
+data.receiver.account.proxy.account
+String | NULL
+เลขตัวแทนบัญชีผู้รับ
+"xxx-x-x5366-x"
+data.receiver.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.bank.id
+String
+เลขธนาคารผู้รับ
+"004"
+data.receiver.bank.name
+String | NULL
+ชื่อธนาคารผู้รับ
+"ธนาคารกสิกรไทย"
+data.sender
+Object
+ข้อมูลผู้ส่ง
+{ ... }
+data.sender.account
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.name
+String
+ชื่อผู้ส่ง
+"บริษัท สลิปทูโก จำกัด",
+data.sender.account.bank
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.bank.account
+String
+เลขที่บัญชีผู้ส่ง
+"xxx-x-x9866-x"
+data.sender.bank
+Object
+ข้อมูลธนาคารผู้ส่ง
+{ ... }
+data.sender.bank.id
+String
+เลขธนาคารผู้ส่ง
+"004"
+data.sender.bank.name
+String | NULL
+ชื่อธนาคารผู้ส่ง
+"ธนาคารกสิกรไทย"
+ตัวอย่าง Request Body (JSON)
+
+คัดลอก
+{    
+  "code": "200000",    
+  "message": "Slip found",    
+  "data": {        
+    "referenceId": "92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",        
+    "decode": "0041000600000101030040220014242082547BPM049885102TH9104xxxx",        
+    "transRef": "015073144041ATF00999",        
+    "dateTime": "2025-04-23T08:32:45.123Z",        
+    "amount": 1,        
+    "ref1": null,        
+    "ref2": null,        
+    "ref3": null,        
+    "receiver": {            
+    "account": {                
+      "name": "บริษัท สลิปทูโก จำกัด",                
+      "bank": {                    
+        "account": "xxx-x-x5366-x"                
+      },                
+      "proxy": {                   
+        "type": "NATID",                    
+        "account": "xxx-x-x5366-x"                
+      },            
+    },            
+    "bank": {               
+      "id": "004",                
+      "name": "ธนาคารกสิกรไทย"            
+    }        
+  },        
+  "sender": {            
+      "account": {                
+        "name": "บริษัท สลิปทูโก จำกัด",                
+        "bank": {                    
+          "account": "xxx-x-x9866-x"                
+        }            
+      },            
+      "bank": {                
+        "id": "004",                
+        "name": "ธนาคารกสิกรไทย"            
+      }        
+    },    
+  }
+}
+ตรวจสอบสลิปด้วย Base64
+
+Req
+รายละเอียด Request
+
+Res
+รายละเอียด Response
+
+ตัวอย่างการใช้งาน
+POST
+Endpoint:
+/api/verify-slip/qr-base64/info
+Auth Required
+วิธีการใช้งาน
+จะต้องระบุ API Secret มากับ Header ทุกครั้ง ที่เรียกใช้งาน API*ดูวิธีใช้งานได้ที่หน้า Authentication
+สามารถระบุ IP Whitelist เพื่อกำหนดการเข้าถึง API จาก IP ที่กำหนดได้
+หากต้องการตรวจสอบเงื่อนไขสลิป ให้ส่งข้อมูลเฉพาะ Key ที่ต้องการตรวจสอบเท่านั้น*ดูวิธีใช้งานที่หน้า ตัวอย่างการใช้งาน
+Request Body (JSON)
+key
+Type
+Description
+Example
+Required
+payload
+Object
+Object ข้อมูลทั้งหมด
+{ payload: { ... } }
+payload.imageBase64
+String
+รหัส Image Base64
+data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4SvPRXhpZgAATU0AKgAAAAgABgESAAMAAAABAAEAAAEaAAUAAAABAAAAVgEbAAUAAAABAAAA...
+payload.checkCondition
+Object
+Object ข้อมูลที่ต้องการตรวจสอบเงื่อนไข
+*ระบุหากต้องการตรวจสอบเงื่อนไขเพิ่มเติม
+{ ... }
+payload.checkCondition.checkDuplicate
+Boolean
+Flag สำหรับตรวจสอบสลิปซ้ำ
+*ระบุหากต้องการตรวจสอบสลิปซ้ำ
+true | false
+payload.checkCondition.checkReceiver
+Array
+Array การตรวจสอบบัญชีผู้รับ
+*ระบุได้มากกว่า 1 Object เพื่อตรวจสอบหลายเงื่อนไขในคราวเดียว
+*หากข้อมูลตรงกับเงื่อนไขอย่างน้อย 1 เงื่อนไขจะถือว่าสลิปถูกต้อง
+[{ receiver1 }, { receiever2 }, ...]
+payload.checkCondition.checkReceiver.accountType
+String
+ตรวจสอบประเภทบัญชี
+*ระบุหากต้องการตรวจสอบประเภทบัญชี
+"01002" = ธนาคาร...
+payload.checkCondition.checkReceiver.accountNameTH
+String
+ชื่อบัญชีผู้รับภาษาไทย
+*ระบุหากต้องการตรวจสอบชื่อบัญชีภาษาไทย
+"สมชาย สลิปทูโก"
+*ห้ามใส่คำนำหน้า
+payload.checkCondition.checkReceiver.accountNameEN
+String
+ชื่อบัญชีผู้รับภาษาอังกฤษ
+*ระบุหากต้องการตรวจสอบชื่อบัญชีภาษาอังกฤษ
+"Somchay Slip2go"
+*ห้ามใส่คำนำหน้า
+payload.checkCondition.checkReceiver.accountNumber
+String
+เลขที่บัญชี
+*ระบุหากต้องการตรวจสอบเลขที่บัญชี
+"xxxxxx1234"
+*ห้ามเว้นวรรคหรือใส่สัญลักษณ์
+payload.checkCondition.checkAmount
+Object
+Object การตรวจสอบจำนวนเงิน
+*ระบุหากต้องการตรวจสอบจำนวนเงินโอน
+{ ... }
+payload.checkCondition.checkAmount.type
+String
+รูปแบบการตรวจสอบจำนวนเงิน
+*ระบุรูปแบบการตรวจสอบ
+"lte" = น้อยกว่าหรือเท่ากับ
+"eq" = เท่ากับ
+"gte" = มากกว่าหรือเท่ากับ
+*หากไม่ระบุจะมีค่าเท่ากับ "eq"
+payload.checkCondition.checkAmount.amount
+String
+จำนวนเงิน
+*ระบุจำนวนเงินที่ต้องการตรวจสอบ
+"10000"
+*ห้ามใส่ 0 และลูกน้ำ
+payload.checkCondition.checkDate
+Object
+Object การตรวจสอบวันที่โอน
+*ระบุหากต้องการตรวจสอบวันที่โอน
+{ ... }
+payload.checkCondition.checkDate.type
+String
+รูปแบบการตรวจสอบวันที่
+*ระบุรูปแบบการตรวจสอบ
+"lte" = น้อยกว่าหรือเท่ากับ
+"eq" = เท่ากับ
+"gte" = มากกว่าหรือเท่ากับ
+*หากไม่ระบุจะมีค่าเท่ากับ "eq"
+payload.checkCondition.checkDate.date
+DateISO
+วันที่โอน
+*ระบุวันที่โอน
+"2025-10-05T14:48:00.000Z"
+*ระบุเป็นเวลา GMT
+
+คัดลอก
+{
+  "payload": {
+      "imageBase64": "data:image/jpeg;base64,/9j/..."
+  }
+}
+ตรวจสอบสลิปด้วย Base64
+
+Req
+รายละเอียด Request
+
+Res
+รายละเอียด Response
+
+ตัวอย่างการใช้งาน
+POST
+Endpoint:
+/api/verify-slip/qr-base64/info
+Auth Required
+รายละเอียด Response
+key
+Type
+Description
+Example
+code
+String
+รหัสผลลัพธ์ของการทำรายการ
+"200000"
+message
+String
+ข้อความผลลัพธ์ของการทำรายการ
+"Slip found"
+data
+Object | undefined
+ผลลัพธ์ข้อมูลทั้งหมด
+{ ... }
+data.referenceId
+String
+รหัสอ้างอิงสลิป
+"92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",
+data.decode
+String
+รหัสอ้างอิง QR Code
+"0041000600000101030040220014242082547BPM049885102TH9104xxxx",
+data.transRef
+String
+รหัสอ้างอิงของข้อมูลชุดนี้
+"015073144041ATF00999",
+data.dateTime
+String
+วันที่โอน
+"2025-10-05T14:48:00.000Z",
+data.amount
+Number
+จำนวนเงินที่โอน
+1
+data.ref1
+String | NULL
+รหัสอ้างอิง 1
+"xxx" | null
+data.ref2
+String | NULL
+รหัสอ้างอิง 2
+"xxx" | null
+data.ref3
+String | NULL
+รหัสอ้างอิง 3
+"xxx" | null
+data.receiver
+Object
+ข้อมูลผู้รับ
+{ ... }
+data.receiver.account
+Object
+ข้อมูลบัญชีผู้รับ
+{ ... }
+data.receiver.account.name
+String
+ชื่อบัญชีผู้รับ
+"บริษัท สลิปทูโก จำกัด"
+data.receiver.account.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.account.bank.account
+String | NULL
+เลขบัญชีธนาคารผู้รับ
+"xxx-x-x5366-x"
+data.receiver.account.proxy
+Object | NULL
+ข้อมูลตัวแทนบัญชีผู้รับ
+{ ... } | null
+data.receiver.account.proxy.type
+String | NULL
+NATID, MSISDN, EWALLTID, EMAIL, BILLERID
+"NATID"
+data.receiver.account.proxy.account
+String | NULL
+เลขตัวแทนบัญชีผู้รับ
+"xxx-x-x5366-x"
+data.receiver.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.bank.id
+String
+เลขธนาคารผู้รับ
+"004"
+data.receiver.bank.name
+String | NULL
+ชื่อธนาคารผู้รับ
+"ธนาคารกสิกรไทย"
+data.sender
+Object
+ข้อมูลผู้ส่ง
+{ ... }
+data.sender.account
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.name
+String
+ชื่อผู้ส่ง
+"บริษัท สลิปทูโก จำกัด",
+data.sender.account.bank
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.bank.account
+String
+เลขที่บัญชีผู้ส่ง
+"xxx-x-x9866-x"
+data.sender.bank
+Object
+ข้อมูลธนาคารผู้ส่ง
+{ ... }
+data.sender.bank.id
+String
+เลขธนาคารผู้ส่ง
+"004"
+data.sender.bank.name
+String | NULL
+ชื่อธนาคารผู้ส่ง
+"ธนาคารกสิกรไทย"
+ตัวอย่าง Request Body (JSON)
+
+คัดลอก
+{    
+  "code": "200000",    
+  "message": "Slip found",    
+  "data": {        
+    "referenceId": "92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",        
+    "decode": "0041000600000101030040220014242082547BPM049885102TH9104xxxx",        
+    "transRef": "015073144041ATF00999",        
+    "dateTime": "2025-04-23T08:32:45.123Z",        
+    "amount": 1,        
+    "ref1": null,        
+    "ref2": null,        
+    "ref3": null,        
+    "receiver": {            
+    "account": {                
+      "name": "บริษัท สลิปทูโก จำกัด",                
+      "bank": {                    
+        "account": "xxx-x-x5366-x"                
+      },                
+      "proxy": {                   
+        "type": "NATID",                    
+        "account": "xxx-x-x5366-x"                
+      },            
+    },            
+    "bank": {               
+      "id": "004",                
+      "name": "ธนาคารกสิกรไทย"            
+    }        
+  },        
+  "sender": {            
+      "account": {                
+        "name": "บริษัท สลิปทูโก จำกัด",                
+        "bank": {                    
+          "account": "xxx-x-x9866-x"                
+        }            
+      },            
+      "bank": {                
+        "id": "004",                
+        "name": "ธนาคารกสิกรไทย"            
+      }        
+    }  
+  }
+}
+ดึงข้อมูลสลิปเก่า
+
+Req
+รายละเอียด Request
+
+Res
+รายละเอียด Response
+
+ตัวอย่างการใช้งาน
+GET
+Endpoint:
+/api/verify-slip/{referenceId}
+Auth Required
+วิธีการใช้งาน
+จะต้องระบุ API Secret มากับ Header ทุกครั้ง ที่เรียกใช้งาน API*ดูวิธีใช้งานได้ที่หน้า Authentication
+สามารถระบุ IP Whitelist เพื่อกำหนดการเข้าถึง API จาก IP ที่กำหนดได้
+Request Body (JSON)
+key
+Type
+Description
+Example
+Required
+referenceId
+String
+รหัสอ้างอิงสลิป
+"92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",
+
+คัดลอก
+{    
+    "code": "200001",    
+    "message": "Get info success",    
+    "data": {        
+      "referenceId": "92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",        
+      "decode": "0041000600000101030040220014242082547BPM049885102TH9104xxxx",        
+      "transRef": "015073144041ATF00999",        
+      "dateTime": "2025-04-23T08:32:45.123Z",        
+      "verifyDate": "2025-04-23T08:32:45.123Z",        
+      "amount": 1,        
+      "ref1": null,        
+      "ref2": null,        
+      "ref3": null,        
+      "receiver": {            
+        "account": {                
+          "name": "บริษัท สลิปทูโก จำกัด",                
+          "bank": {                    
+            "account": "xxx-x-x5366-x"                
+          },                
+        "proxy": {                    
+          "type": "NATID",                    
+          "account": "xxx-x-x5366-x"                
+        },            
+      },            
+      "bank": {                
+        "id": "004",                
+        "name": "ธนาคารกสิกรไทย"            
+      }        
+    },        
+    "sender": {            
+      "account": {                
+        "name": "บริษัท สลิปทูโก จำกัด",                
+        "bank": {                    
+          "account": "xxx-x-x9866-x"                
+        }            
+      },            
+      "bank": {                
+        "id": "004",               
+        "name": "ธนาคารกสิกรไทย"            
+      }        
+    },    
+  }
+}
+ดึงข้อมูลสลิปเก่า
+
+Req
+รายละเอียด Request
+
+Res
+รายละเอียด Response
+
+ตัวอย่างการใช้งาน
+GET
+Endpoint:
+/api/verify-slip/{referenceId}
+Auth Required
+รายละเอียด Response
+key
+Type
+Description
+Example
+code
+String
+รหัสผลลัพธ์ของการทำรายการ
+"200001"
+message
+String
+ข้อความผลลัพธ์ของการทำรายการ
+"Get Info Success"
+data
+Object | undefined
+ผลลัพธ์ข้อมูลทั้งหมด
+{ ... }
+data.referenceId
+String
+รหัสอ้างอิงสลิป
+"92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",
+data.decode
+String
+รหัสอ้างอิง QR Code
+"0041000600000101030040220014242082547BPM049885102TH9104xxxx",
+data.transRef
+String
+รหัสอ้างอิงของข้อมูลชุดนี้
+"015073144041ATF00999",
+data.dateTime
+String
+วันที่โอน
+"2025-10-05T14:48:00.000Z",
+data.verifyDate
+String
+เวลาที่ส่งตรวจสอบ
+"2025-10-05T14:48:00.000Z",
+data.amount
+Number
+จำนวนเงินที่โอน
+1
+data.ref1
+String | NULL
+รหัสอ้างอิง 1
+"xxx" | null
+data.ref2
+String | NULL
+รหัสอ้างอิง 2
+"xxx" | null
+data.ref3
+String | NULL
+รหัสอ้างอิง 3
+"xxx" | null
+data.receiver
+Object
+ข้อมูลผู้รับ
+{ ... }
+data.receiver.account
+Object
+ข้อมูลบัญชีผู้รับ
+{ ... }
+data.receiver.account.name
+String
+ชื่อบัญชีผู้รับ
+"บริษัท สลิปทูโก จำกัด"
+data.receiver.account.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.account.bank.account
+String | NULL
+เลขบัญชีธนาคารผู้รับ
+"xxx-x-x5366-x"
+data.receiver.account.proxy
+Object | NULL
+ข้อมูลตัวแทนบัญชีผู้รับ
+{ ... } | null
+data.receiver.account.proxy.type
+String | NULL
+NATID, MSISDN, EWALLTID, EMAIL, BILLERID
+"NATID"
+data.receiver.account.proxy.account
+String | NULL
+เลขตัวแทนบัญชีผู้รับ
+"xxx-x-x5366-x"
+data.receiver.bank
+Object
+ข้อมูลธนาคารผู้รับ
+{ ... }
+data.receiver.bank.id
+String
+เลขธนาคารผู้รับ
+"004"
+data.receiver.bank.name
+String | NULL
+ชื่อธนาคารผู้รับ
+"ธนาคารกสิกรไทย"
+data.sender
+Object
+ข้อมูลผู้ส่ง
+{ ... }
+data.sender.account
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.name
+String
+ชื่อผู้ส่ง
+"บริษัท สลิปทูโก จำกัด",
+data.sender.account.bank
+Object
+ข้อมูลบัญชีผู้ส่ง
+{ ... }
+data.sender.account.bank.account
+String
+เลขที่บัญชีผู้ส่ง
+"xxx-x-x9866-x"
+data.sender.bank
+Object
+ข้อมูลธนาคารผู้ส่ง
+{ ... }
+data.sender.bank.id
+String
+เลขธนาคารผู้ส่ง
+"004"
+data.sender.bank.name
+String | NULL
+ชื่อธนาคารผู้ส่ง
+"ธนาคารกสิกรไทย"
+Request Data (Params)
+
+คัดลอก
+{
+    "code": "200001",
+    "message": "Get Info Success",
+    "data": {
+      "referenceId": "92887bd5-60d3-4744-9a98-b8574eaxxxxx-xx",
+      "decode": "0041000600000101030040220014242082547BPM049885102TH9104xxxx",
+      "transRef": "015073144041ATF00999",
+      "dateTime": "2025-10-05T14:48:00.000Z",
+      "amount": 1,
+      "ref1": null,
+      "ref2": null,
+      "ref3": null,
+      "receiver": {
+      "account": {
+        "name": "บริษัท สลิปทูโก จำกัด",
+        "bank": {
+          "account": "xxx-x-x5366-x"
+        },
+        "proxy": {
+          "type": "NATID",
+          "account": "xxx-x-x5366-x"
+        }
+      },
+      "bank": {
+        "id": "004",
+        "name": "ธนาคารกสิกรไทย"
+      }
+    },
+    "sender": {
+      "account": {
+        "name": "บริษัท สลิปทูโก จำกัด",
+        "bank": {
+          "account": "xxx-x-x9866-x"
+        }
+      },
+      "bank": {
+        "id": "004",
+        "name": "ธนาคารกสิกรไทย"
+      }
+    }
+  }
+}

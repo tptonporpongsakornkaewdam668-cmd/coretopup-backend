@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GPTOPUP - NextGen Admin Control</title>
+  <title>COINZONETOPUP - NextGen Admin Control</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -14,10 +14,8 @@
   <div id="login-screen" class="login-screen">
     <div class="login-card">
       <div class="login-logo">
-        <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="3" fill="none">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-        </svg>
-        <span>GPTOPUP <small class="accent">ADMIN</small></span>
+        <img src="/favicon.ico" width="48" height="48" style="border-radius:12px;" onerror="this.src='https://placehold.co/48x48?text=GP'">
+        <span>COINZONE <small class="accent">ADMIN</small></span>
       </div>
       <h1>Welcome back</h1>
       <p class="login-subtitle">System Administration & Control Center</p>
@@ -47,13 +45,12 @@
     <!-- NAVIGATION BAR -->
     <aside class="sidebar">
       <div class="sidebar-logo">
-        <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2.5" fill="none">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-        </svg>
-        <span>GPTOPUP</span>
+        <img src="/favicon.ico" width="32" height="32" style="border-radius:8px;" onerror="this.src='https://placehold.co/32x32?text=GP'">
+        <span>COINZONE</span>
       </div>
 
       <nav class="sidebar-nav">
+        <div class="nav-group">Core</div>
         <a href="#dashboard" class="nav-item active" data-page="dashboard">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <rect x="3" y="3" width="7" height="7"></rect>
@@ -61,36 +58,62 @@
             <rect x="14" y="14" width="7" height="7"></rect>
             <rect x="3" y="14" width="7" height="7"></rect>
           </svg>
-          <span>Dashboard Overview</span>
+          <span>Dashboard</span>
         </a>
-        <a href="#games" class="nav-item" data-page="games">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path
-              d="M6 12L3 9l3-3M18 12l3-3-3-3M3 9h18M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z">
-            </path>
-          </svg>
-          <span>Inventory & Pricing</span>
-        </a>
+
+        <div class="nav-group">Business Management</div>
         <a href="#orders" class="nav-item" data-page="orders">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"></path>
             <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
           </svg>
-          <span>Order Management</span>
+          <span>Orders Ledger</span>
         </a>
         <a href="#users" class="nav-item" data-page="users">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 110-8 4 4 0 010 8z"></path>
             <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"></path>
           </svg>
-          <span>Customer Records</span>
+          <span>Customers</span>
+        </a>
+
+        <div class="nav-group">Catalog & Marketing</div>
+        <a href="#games" class="nav-item" data-page="games">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M6 12L3 9l3-3M18 12l3-3-3-3M3 9h18M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+          </svg>
+          <span>Products & Pricing</span>
+        </a>
+        <a href="#sliders" class="nav-item" data-page="sliders">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="3" y1="9" x2="21" y2="9"></line>
+            <line x1="9" y1="21" x2="9" y2="9"></line>
+          </svg>
+          <span>Hero Sliders</span>
+        </a>
+        <a href="#discounts" class="nav-item" data-page="discounts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 5l-1.41 1.41L15 7.83 17.17 10H8c-1.1 0-2 .9-2 2v7"></path>
+            <path d="M19 13.5V9a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h10l4.5 4.5V13.5z"></path>
+          </svg>
+          <span>Promo Codes</span>
+        </a>
+
+        <div class="nav-group">Infrastructure</div>
+        <a href="#settings" class="nav-item" data-page="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 .51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>System Config</span>
         </a>
         <a href="#docs" class="nav-item" data-page="docs">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"></path>
             <polyline points="13 2 13 9 20 9"></polyline>
           </svg>
-          <span>API Infrastructure</span>
+          <span>Developer Hub</span>
         </a>
       </nav>
 
@@ -113,11 +136,21 @@
     <!-- CONTENT LAYER -->
     <main class="main">
       <header class="topbar">
-        <div>
-          <h2 class="page-title" id="current-page-title">Dashboard</h2>
-          <p class="page-subtitle" id="current-page-subtitle">Real-time system insights</p>
+        <div style="display:flex; align-items:center; gap:16px">
+          <button id="mobile-menu-toggle" class="btn btn-s glass" style="display:none; padding:8px">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div>
+            <h2 id="current-page-title" class="page-title">Executive Overview</h2>
+            <p id="current-page-subtitle" class="page-subtitle">Real-time system telemetry and financial status</p>
+          </div>
         </div>
-        <div class="topbar-right">
+        <div class="topbar-actions">
+          <!-- Add notifications or search here -->
           <div id="server-status" class="badge badge-success">
             <span class="status-dot"></span> System Live
           </div>
@@ -131,86 +164,102 @@
           <div class="stats-grid">
             <div class="stat-card">
               <div class="stat-header">
-                <div class="stat-icon purple"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path d="M12 2v20M2 12h20M12 2l-4 4M12 2l4 4M12 22l-4-4M12 22l4-4"></path>
-                  </svg></div>
+                <div class="stat-icon purple">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 110-8 4 4 0 010 8z"></path>
+                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"></path>
+                  </svg>
+                </div>
+                <div class="badge badge-success">Active</div>
               </div>
               <div class="stat-info">
-                <p class="stat-label">Total Users</p>
+                <p class="stat-label">Customer Base</p>
                 <h2 class="stat-value" id="stat-users">0</h2>
               </div>
             </div>
             <div class="stat-card">
               <div class="stat-header">
-                <div class="stat-icon blue"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
-                    </path>
-                  </svg></div>
+                <div class="stat-icon blue">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  </svg>
+                </div>
               </div>
               <div class="stat-info">
-                <p class="stat-label">Total Orders</p>
+                <p class="stat-label">Total Volume</p>
                 <h2 class="stat-value" id="stat-orders">0</h2>
               </div>
             </div>
             <div class="stat-card">
               <div class="stat-header">
-                <div class="stat-icon green"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                  </svg></div>
+                <div class="stat-icon green">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                  </svg>
+                </div>
+                <div class="badge badge-info">Success</div>
               </div>
               <div class="stat-info">
-                <p class="stat-label">Completed</p>
+                <p class="stat-label">Completed Orders</p>
                 <h2 class="stat-value" id="stat-revenue">0</h2>
               </div>
             </div>
             <div class="stat-card">
               <div class="stat-header">
-                <div class="stat-icon orange"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
+                <div class="stat-icon orange">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
-                  </svg></div>
+                  </svg>
+                </div>
+                <div class="badge badge-warning">Action</div>
               </div>
               <div class="stat-info">
-                <p class="stat-label">Pending</p>
+                <p class="stat-label">Awaiting Process</p>
                 <h2 class="stat-value" id="stat-pending">0</h2>
               </div>
             </div>
           </div>
 
           <div class="grid-main">
-            <div class="card">
+            <div class="card glass">
               <div class="card-header">
-                <h3 class="card-title">Live Transactions</h3>
+                <h3 class="card-title">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  Activity Monitor
+                </h3>
+                <span class="badge badge-info">Live Stream</span>
               </div>
               <div class="table-container">
                 <table id="dash-orders-table">
                   <thead>
                     <tr>
                       <th>Order ID</th>
-                      <th>Game</th>
-                      <th>Amount</th>
-                      <th>Status</th>
+                      <th>Product Catalog</th>
+                      <th>Financials</th>
+                      <th>Status State</th>
                     </tr>
                   </thead>
                   <tbody id="dash-orders-tbody">
                     <tr>
-                      <td colspan="4" style="text-align:center;padding:40px;color:var(--text-dim)">Initializing...</td>
+                      <td colspan="4" style="text-align:center;padding:60px;color:var(--text-dim)">
+                        <div class="loader-pulse"></div>
+                        <p style="margin-top:16px">Connecting to transaction stream...</p>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
-            <div class="card">
+            <div class="card glass">
               <div class="card-header">
                 <h3 class="card-title">Infrastructure Health</h3>
               </div>
-              <div id="status-bars" style="display:flex;flex-direction:column;gap:1.5rem">
+              <div id="status-bars" class="status-stack">
                 <!-- Status items will be injected -->
               </div>
             </div>
@@ -219,19 +268,53 @@
 
         <!-- GAMES PAGE -->
         <div id="page-games" class="page">
-          <div class="card-header" style="margin-bottom:32px">
-            <p id="games-count" class="badge badge-info">Calculating game inventory...</p>
-            <input type="text" id="game-search" class="input-styled" style="width:300px"
-              placeholder="Search catalog..." />
+          <div id="games-list-view">
+            <div class="card glass" style="margin-bottom:32px">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title">Product Catalog</h3>
+                  <p id="games-count" class="text-xs text-muted">Calculating game inventory...</p>
+                </div>
+                <div class="search-box">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input type="text" id="game-search" placeholder="Search products..." />
+                </div>
+              </div>
+            </div>
+            <div id="games-grid" class="games-grid">
+              <!-- Game cards injected via JS -->
+            </div>
           </div>
-          <div id="games-grid" class="games-grid">
-            <!-- Game cards injected via JS -->
+
+          <div id="game-packages-view" class="hidden">
+            <div class="card glass" style="margin-bottom:32px">
+              <div class="card-header">
+                <div style="display:flex; align-items:center; gap:16px">
+                  <button class="btn btn-s glass" onclick="showGamesList()" style="padding: 8px">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3">
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                  </button>
+                  <div>
+                    <h3 class="card-title" id="selected-game-title">Game Title</h3>
+                    <p class="text-xs text-muted">Manage packages and overrides</p>
+                  </div>
+                </div>
+                <div id="selected-game-badge" class="badge badge-info">Game ID</div>
+              </div>
+            </div>
+            <div id="packages-list-container" class="packages-list-tall">
+              <!-- Packages injected via JS -->
+            </div>
           </div>
         </div>
 
         <!-- ORDERS PAGE -->
         <div id="page-orders" class="page">
-          <div class="card">
+          <div class="card glass">
             <div class="card-header">
               <h3 class="card-title">Transaction Ledger</h3>
               <div style="display:flex;gap:12px">
@@ -243,21 +326,22 @@
                   <option value="completed">Completed</option>
                   <option value="failed">Failed</option>
                 </select>
-                <input type="text" id="order-search" class="input-styled" style="width:250px"
-                  placeholder="Filter by ID/Game..." />
+                <div class="search-box">
+                  <input type="text" id="order-search" placeholder="Filter by ID/Game..." />
+                </div>
               </div>
             </div>
             <div class="table-container">
               <table id="orders-table">
                 <thead>
                   <tr>
-                    <th>Order ID</th>
-                    <th>Customer</th>
-                    <th>Product</th>
-                    <th>Reference</th>
-                    <th>Status</th>
-                    <th>Timestamp</th>
-                    <th>Manage</th>
+                    <th>Order Entry</th>
+                    <th>Client Identity</th>
+                    <th>Product Model</th>
+                    <th>Network Ref</th>
+                    <th>Lifecycle</th>
+                    <th>Time Record</th>
+                    <th>Control</th>
                   </tr>
                 </thead>
                 <tbody id="orders-tbody"></tbody>
@@ -280,6 +364,7 @@
                     <th>Profile</th>
                     <th>Email Address</th>
                     <th>Balance</th>
+                    <th>Points</th>
                     <th>Registration</th>
                   </tr>
                 </thead>
@@ -289,7 +374,102 @@
           </div>
         </div>
 
-        <!-- API DOCS PAGE -->
+        <!-- DISCOUNTS PAGE -->
+        <div id="page-discounts" class="page">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Promotional Discount Codes</h3>
+              <button class="btn btn-p" id="add-discount-btn">Create New Code</button>
+            </div>
+            <div class="table-container">
+              <table id="discounts-table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>Min. Order</th>
+                    <th>Status</th>
+                    <th>Usage</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="discounts-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- SLIDERS PAGE -->
+        <div id="page-sliders" class="page">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Home Hero Sliders</h3>
+              <button class="btn btn-p" id="add-slider-btn">Add New Banner</button>
+            </div>
+            <div class="table-container">
+              <table id="sliders-table">
+                <thead>
+                  <tr>
+                    <th>Image</th>
+                    <th>Destination Link</th>
+                    <th>Sort Order</th>
+                    <th>Management</th>
+                  </tr>
+                </thead>
+                <tbody id="sliders-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SETTINGS PAGE -->
+        <div id="page-settings" class="page">
+          <div class="grid-main">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Points & Rewards Policy</h3>
+              </div>
+              <div class="card-body" style="padding:24px">
+                <form id="settings-points-form">
+                  <div class="group-row">
+                    <div class="form-group">
+                      <label class="form-label">Earn Threshold (THB)</label>
+                      <input id="setting-point-threshold" type="number" class="input-styled" placeholder="100" />
+                      <p class="text-xs opacity-50">ยอดซื้อขั้นต่ำเพื่อรับแต้ม</p>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Earn Rate (Points)</label>
+                      <input id="setting-point-earn" type="number" class="input-styled" placeholder="1" />
+                      <p class="text-xs opacity-50">จำนวนแต้มที่ได้รับ</p>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Redeem Rate (1 Point = X THB)</label>
+                    <input id="setting-point-redeem" type="number" step="0.01" class="input-styled" placeholder="0.1" />
+                    <p class="text-xs opacity-50">มูลค่าต่อ 1 แต้ม (ใช้เป็นส่วนลด)</p>
+                  </div>
+                  <button type="submit" class="btn btn-p" style="margin-top:12px">Save Point Config</button>
+                </form>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Agreement & Terms</h3>
+              </div>
+              <div class="card-body" style="padding:24px">
+                <form id="settings-agreement-form">
+                  <div class="form-group">
+                    <label class="form-label">Agreement Content (Thai/English)</label>
+                    <textarea id="setting-agreement-text" class="input-styled" style="height:250px; resize:none;" placeholder="Enter specific terms..."></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-p" style="margin-top:12px">Update Agreement</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div id="page-docs" class="page">
           <div id="api-docs-content" class="api-docs">
             <!-- Docs injected via JS -->
@@ -425,6 +605,10 @@
         <label class="form-label">Set Absolute Balance (฿)</label>
         <input id="balance-modal-amount" type="number" min="0" step="0.01" class="input-styled" />
       </div>
+      <div class="form-group">
+        <label class="form-label">Reward Points (PTS)</label>
+        <input id="balance-modal-points" type="number" min="0" class="input-styled" />
+      </div>
       <div class="modal-footer">
         <button id="balance-modal-cancel" class="btn btn-s">Cancel</button>
         <button id="balance-modal-confirm" class="btn btn-p">Save Balance</button>
@@ -432,7 +616,107 @@
     </div>
   </div>
 
-  <!-- TOAST NOTIFICATION -->
+  <!-- SLIDER MODAL -->
+  <div id="slider-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:440px">
+      <div class="modal-header">
+        <h3 class="modal-title">Add New Slider</h3>
+        <p class="modal-desc">Upload a new image for the home page slider.</p>
+      </div>
+
+      <form id="slider-form">
+        <div class="form-group">
+          <label class="form-label">Banner Image (Required)</label>
+          <input id="slider-input-file" type="file" class="input-styled" accept="image/*" required />
+          <p class="text-xs opacity-50 mt-2">Recommended: 1200x400px or 1920x600px</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Action Link (Optional)</label>
+          <input id="slider-input-url" type="text" class="input-styled" placeholder="https://..." />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Sequence (Order)</label>
+          <input id="slider-input-order" type="number" class="input-styled" value="0" />
+        </div>
+
+        <div id="slider-preview"
+          style="width:100%; height:120px; border-radius:12px; background:var(--card); display:flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid var(--border); margin-bottom: 20px;">
+          <span class="text-dim text-xs">Image Preview</span>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="slider-modal-cancel" class="btn btn-s">Cancel</button>
+          <button type="submit" id="slider-modal-confirm" class="btn btn-p">Upload Slide</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- DISCOUNT MODAL -->
+  <div id="discount-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:500px">
+      <div class="modal-header">
+        <h3 class="modal-title" id="discount-modal-title">Configure Promo Code</h3>
+        <p class="modal-desc">Define rules for your promotional campaign.</p>
+      </div>
+
+      <form id="discount-form">
+        <div class="form-group">
+          <label class="form-label">Discount Code (Uppercase)</label>
+          <input id="discount-input-code" type="text" class="input-styled" placeholder="SUMMER2026" required />
+        </div>
+
+        <div class="group-row">
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <select id="discount-input-type" class="input-styled">
+              <option value="fixed">Fixed Amount (฿)</option>
+              <option value="percent">Percentage (%)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Value</label>
+            <input id="discount-input-value" type="number" step="0.01" class="input-styled" required />
+          </div>
+        </div>
+
+        <div class="group-row">
+          <div class="form-group">
+            <label class="form-label">Min. Order (฿)</label>
+            <input id="discount-input-min" type="number" class="input-styled" value="0" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max. Discount (฿)</label>
+            <input id="discount-input-max" type="number" class="input-styled" placeholder="None" />
+          </div>
+        </div>
+
+        <div class="group-row">
+          <div class="form-group">
+            <label class="form-label">Usage Limit</label>
+            <input id="discount-input-limit" type="number" class="input-styled" placeholder="Unlimited" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Expiry Date</label>
+            <input id="discount-input-end" type="datetime-local" class="input-styled" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="display:flex; align-items:center; gap:10px">
+            <input id="discount-input-active" type="checkbox" checked />
+            Is Active / Enabled
+          </label>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="discount-modal-cancel" class="btn btn-s">Cancel</button>
+          <button type="submit" id="discount-modal-confirm" class="btn btn-p">Save Promo Code</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <div id="toast" class="toast hidden"
     style="position:fixed;bottom:30px;right:30px;z-index:9999;padding:16px 24px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text-main);box-shadow:var(--shadow-md);transform:translateY(100px);opacity:0;transition:all 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)">
   </div>

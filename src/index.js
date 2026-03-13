@@ -14,6 +14,7 @@ const peamsubRoutes = require("./routes/peamsub");
 const paymentRoutes = require("./routes/payment");
 const historyRoutes = require("./routes/history");
 const wepayRoutes = require("./routes/wepay");
+const slidersRoutes = require("./routes/sliders");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -65,6 +66,7 @@ app.use("/api/peamsub", peamsubRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/history", historyRoutes);
 app.use("/api/wepay-game", wepayRoutes);
+app.use("/api/sliders", slidersRoutes);
 
 // Serve Static Admin Panel
 const adminPath = path.join(__dirname, "public", "admin");
@@ -88,8 +90,13 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ success: false, message: "Internal server error" });
+  console.error("🔥 Global Error Handler:", err.stack);
+  res.status(500).json({ 
+    success: false, 
+    message: "Internal server error", 
+    error: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined 
+  });
 });
 
 app.listen(PORT, () => {

@@ -96,6 +96,76 @@ router.post("/", async (req, res) => {
         }
     }
 
+    // 1.5. ดึงรายการบัตรเงินสด/Gift Card (cashcard_list) - ดึงจาก rawData.cashcard โดยตรง
+    if (action === "cashcard_list") {
+        try {
+            const result = await getWepayProductList();
+            if (result.statusCode !== 200) return res.status(result.statusCode).json(result.data);
+
+            const rawData = result.data.data || {};
+            const cashcardItems = rawData.cashcard || []; // ✅ ใช้ array cashcard โดยตรง
+
+            const { data: overrides } = await supabase.from("product_overrides").select("*");
+            const overrideMap = {};
+            overrides?.forEach(o => { overrideMap[`${o.company_id}_${o.original_price}`] = o; });
+
+            const { data: gameSettings } = await supabase.from("game_settings").select("*");
+            const settingsMap = {};
+            gameSettings?.forEach(s => { settingsMap[s.company_id] = s; });
+
+            const formatted = [];
+            const now = new Date();
+
+            cashcardItems.forEach(card => {
+                const setting = settingsMap[card.company_id];
+                const displayName = setting?.custom_name || card.company_name;
+                const displayImg = setting?.custom_image_url || card.img || null;
+
+                if (card.denomination && Array.isArray(card.denomination)) {
+                    card.denomination.forEach(denom => {
+                        const basePrice = parseFloat(denom.price || 0);
+                        const override = overrideMap[`${card.company_id}_${basePrice}`];
+
+                        let finalPrice = basePrice;
+                        let isDiscounted = false;
+                        if (override) {
+                            finalPrice = parseFloat(override.selling_price || basePrice);
+                            if (override.discount_price && override.discount_start && override.discount_end) {
+                                const start = new Date(override.discount_start);
+                                const end = new Date(override.discount_end);
+                                if (now >= start && now <= end) { finalPrice = parseFloat(override.discount_price); isDiscounted = true; }
+                            }
+                        }
+
+                        // แปลง description จาก HTML เป็น plain text
+                        const cleanDesc = denom.description
+                            ? denom.description.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()
+                            : `${basePrice} บาท`;
+
+                        formatted.push({
+                            id: card.company_id,
+                            original_id: card.company_id,
+                            name: `${displayName} ${basePrice} บาท`,
+                            price: finalPrice,
+                            base_price: basePrice,
+                            category: displayName,
+                            description: cleanDesc,
+                            img: displayImg || null,
+                            type: 'cashcard',
+                            is_discount: isDiscounted,
+                        });
+                    });
+                }
+            });
+
+            console.log(`✅ CashCard list: ${formatted.length} items from ${cashcardItems.length} cards`);
+            return res.json({ statusCode: 200, data: formatted });
+        } catch (error) {
+            console.error("❌ CashCard List Error:", error);
+            return res.status(500).json({ statusCode: 500, message: "เกิดข้อผิดพลาดในการโหลดบัตรเงินสด", error: error.message });
+        }
+    }
+
     // 2. ตรวจสอบสถานะรายการ (check_order) - ตาม wepay.txt ข้อ 9
     if (action === "check_order") {
         const { transaction_id } = params;
@@ -108,13 +178,57 @@ router.post("/", async (req, res) => {
         return res.status(result.statusCode).json(result.data);
     }
 
+    // 2.5 ตรวจสอบโค้ดส่วนลด (verify_discount)
+    if (action === "verify_discount") {
+        const { code, amount } = params;
+        if (!code) return res.status(400).json({ success: false, message: "Missing code" });
+
+        try {
+            const { data: discount, error } = await supabase
+                .from("discount_codes")
+                .select("*")
+                .eq("code", code.toUpperCase())
+                .eq("is_active", true)
+                .maybeSingle();
+
+            if (error || !discount) return res.status(404).json({ success: false, message: "ไม่พบโค้ดส่วนลดนี้ หรือโค้ดหมดอายุแล้ว" });
+
+            const now = new Date();
+            if (discount.end_date && now > new Date(discount.end_date)) {
+                return res.status(400).json({ success: false, message: "โค้ดส่วนลดนี้หมดอายุแล้ว" });
+            }
+
+            if (discount.usage_limit && discount.usage_count >= discount.usage_limit) {
+                return res.status(400).json({ success: false, message: "โค้ดส่วนลดนี้ถูกใช้ครบจำนวนแล้ว" });
+            }
+
+            if (amount < discount.min_order_amount) {
+                return res.status(400).json({ success: false, message: `ยอดสั่งซื้อขั้นต่ำต้องถึง ${discount.min_order_amount} บาท` });
+            }
+
+            let discountAmount = 0;
+            if (discount.type === 'percent') {
+                discountAmount = (amount * discount.value) / 100;
+                if (discount.max_discount && discountAmount > discount.max_discount) {
+                    discountAmount = discount.max_discount;
+                }
+            } else {
+                discountAmount = discount.value;
+            }
+
+            return res.json({ success: true, data: discount, discountAmount });
+        } catch (err) {
+            return res.status(500).json({ success: false, message: err.message });
+        }
+    }
+
     // 3. การสั่งซื้อ (purchase) - จำกัดสิทธิ์: ต้องล็อกอิน
     if (action === "purchase") {
         return authenticate(req, res, async () => {
             let currentStep = "initializing";
             try {
                 let { productId, reference, payload } = params;
-                const { playerId, server } = payload || {};
+                const { playerId, server, promoCode } = payload || {};
 
                 // Fallback: ดึงข้อมูล productId จากตำแหน่งที่มีโอกาสเป็นไปได้มากที่สุด
                 productId = productId || payload?.productId || payload?.company_id || payload?.id;
@@ -162,15 +276,57 @@ router.post("/", async (req, res) => {
                     }
                 }
 
-                // 🔍 2. ดึงชื่อเกม
+                // 🔍 1.5 ตรวจสอบ Promo Code (ถ้ามีการส่งมา)
+                let discountAmount = 0;
+                let appliedPromo = null;
+
+                if (promoCode) {
+                    const { data: discount } = await supabase
+                        .from("discount_codes")
+                        .select("*")
+                        .eq("code", promoCode.toUpperCase())
+                        .eq("is_active", true)
+                        .maybeSingle();
+
+                    if (discount) {
+                        const isExpired = discount.end_date && now > new Date(discount.end_date);
+                        const isLimitReached = discount.usage_limit && discount.usage_count >= discount.usage_limit;
+                        const isMinMet = expectedPrice >= discount.min_order_amount;
+
+                        if (!isExpired && !isLimitReached && isMinMet) {
+                            if (discount.type === 'percent') {
+                                discountAmount = (expectedPrice * discount.value) / 100;
+                                if (discount.max_discount && discountAmount > discount.max_discount) {
+                                    discountAmount = discount.max_discount;
+                                }
+                            } else {
+                                discountAmount = discount.value;
+                            }
+                            appliedPromo = discount;
+                        }
+                    }
+                }
+                
+                const finalAmount = Math.max(0, expectedPrice - discountAmount);
+                
+                // 🔍 2. ดึงชื่อเกมและการตั้งค่า
                 const { data: gSetting } = await supabase
                     .from("game_settings")
-                    .select("custom_name")
                     .eq("company_id", productId)
                     .maybeSingle();
 
-                const finalAmount = expectedPrice;
                 const gameDisplayName = gSetting?.custom_name || (payload.name ? payload.name.split('-')[0].trim() : "wePAY Game");
+
+                // 🔍 2.5 ดึงการตั้งค่าแต้ม
+                const { data: sData } = await supabase.from("system_settings").select("*");
+                const sysConfig = (sData || []).reduce((acc, curr) => {
+                    acc[curr.key] = curr.value;
+                    return acc;
+                }, {});
+
+                const earnThreshold = parseFloat(sysConfig.point_earn_threshold || 100);
+                const earnRate = parseFloat(sysConfig.point_earn_rate || 1);
+                const earnedPoints = Math.floor(finalAmount / earnThreshold) * earnRate;
 
                 currentStep = "checking_wallet";
                 // 🛡️ 3. ตรวจสอบยอดเงิน
@@ -219,13 +375,25 @@ router.post("/", async (req, res) => {
                     payment_method: "wallet",
                     status: result.statusCode === 200 ? "processing" : "failed",
                     reference: reference,
+                    earned_points: earnedPoints,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 };
 
+                // หากมีโค้ดส่วนลด ให้บันทึกลง Order ด้วย (ถ้าตารางรองรับ)
+                newOrder.discount_amount = discountAmount;
+                newOrder.promo_code = promoCode || null;
+
                 const { error: dbError } = await supabase.from("orders").insert([newOrder]);
                 if (dbError) {
                     console.error("❌ Supabase DB Insert Error:", dbError.message);
+                }
+
+                // สรุปการใช้โค้ดส่วนลดใน DB
+                if (appliedPromo) {
+                    await supabase.from("discount_codes")
+                        .update({ usage_count: (appliedPromo.usage_count || 0) + 1 })
+                        .eq("id", appliedPromo.id);
                 }
 
                 return res.status(result.statusCode).json(result.data);
@@ -250,6 +418,20 @@ router.post("/", async (req, res) => {
                 });
             }
         });
+    }
+
+    // 4. ดึงข้อมูลการตั้งค่าระบบ (แต้ม/ข้อตกลง)
+    if (action === "get-settings") {
+        try {
+            const { data: settings } = await supabase.from("system_settings").select("*");
+            const config = settings.reduce((acc, curr) => {
+                acc[curr.key] = curr.value;
+                return acc;
+            }, {});
+            return res.json({ success: true, data: config });
+        } catch (err) {
+            return res.status(500).json({ success: false, message: err.message });
+        }
     }
 
     res.status(400).json({ message: `Action [${action}] ไม่ถูกต้อง` });
@@ -283,6 +465,14 @@ router.post("/callback", express.urlencoded({ extended: true }), async (req, res
         // สถานะจาก wePAY: 2 = สำเร็จ, 4 = ล้มเหลว
         if (status == "2") {
             await supabase.from("orders").update({ status: "success" }).eq("reference", dest_ref);
+            
+            // 🎁 มอบแต้มให้ผู้ใช้ (ถ้ามี)
+            if (order.earned_points > 0) {
+                const { data: userData } = await supabase.from("users").select("points").eq("id", order.user_id).single();
+                const newPoints = (userData?.points || 0) + order.earned_points;
+                await supabase.from("users").update({ points: newPoints }).eq("id", order.user_id);
+                console.log(`🎁 Awarded ${order.earned_points} points to user ${order.user_id}`);
+            }
         } else if (status == "4") {
             // ล้มเหลว: เปลี่ยนสถานะและคืนเงินเข้า Wallet
             await supabase.from("orders").update({ status: "failed" }).eq("reference", dest_ref);

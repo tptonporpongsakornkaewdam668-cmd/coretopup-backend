@@ -5,8 +5,15 @@ const { authenticateAdmin } = require("../middleware/adminAuth");
 const { adminLoginRules } = require("../middleware/validate");
 const { adminLimiter } = require("../middleware/rateLimiter");
 const { supabase } = require("../db");
+const multer = require("multer");
 
 const router = express.Router();
+
+// Multer storage for slider images
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 
 // ─── POST /api/admin/login ────────────────────────────────────────────────────
 router.post("/login", adminLimiter, adminLoginRules, async (req, res) => {
@@ -85,6 +92,55 @@ router.patch("/users/:id/balance", authenticateAdmin, async (req, res) => {
 
     if (error) return res.status(500).json({ success: false, message: error.message });
     res.json({ success: true, message: "ปรับปรุงยอดเงินสำเร็จ", data: user });
+});
+
+// ─── PATCH /api/admin/users/:id/points ────────────────────────────────────────
+router.patch("/users/:id/points", authenticateAdmin, async (req, res) => {
+    const { points } = req.body;
+    const { data: user, error } = await supabase
+        .from("users")
+        .update({ points, updated_at: new Date().toISOString() })
+        .eq("id", req.params.id)
+        .select()
+        .single();
+
+    if (error) return res.status(500).json({ success: false, message: error.message });
+    res.json({ success: true, message: "ปรับปรุงแต้มสำเร็จ", data: user });
+});
+
+// ─── GET /api/admin/settings ──────────────────────────────────────────────────
+router.get("/settings", authenticateAdmin, async (req, res) => {
+    const { data: settings, error } = await supabase
+        .from("system_settings")
+        .select("*");
+
+    if (error) return res.status(500).json({ success: false, message: error.message });
+    
+    // Convert array to object key-value pairs
+    const config = settings.reduce((acc, curr) => {
+        acc[curr.key] = curr.value;
+        return acc;
+    }, {});
+
+    res.json({ success: true, data: config });
+});
+
+// ─── PATCH /api/admin/settings ────────────────────────────────────────────────
+router.patch("/settings", authenticateAdmin, async (req, res) => {
+    const settings = req.body; // Expecting { key1: value1, key2: value2 }
+    
+    try {
+        const updates = Object.entries(settings).map(([key, value]) => {
+            return supabase
+                .from("system_settings")
+                .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+        });
+
+        await Promise.all(updates);
+        res.json({ success: true, message: "บันทึกการตั้งค่าสำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // ─── GET /api/admin/orders ────────────────────────────────────────────────────
@@ -174,6 +230,151 @@ router.patch("/games/settings", authenticateAdmin, async (req, res) => {
     } catch (error) {
         console.error("❌ Game Settings Error:", error);
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ─── Slider Management ────────────────────────────────────────────────────────
+
+// GET /api/admin/sliders
+router.get("/sliders", authenticateAdmin, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from("sliders")
+            .select("*")
+            .order("order_index", { ascending: true });
+
+        if (error) throw error;
+        res.json({ success: true, data });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/admin/sliders - Upload and Add Slider
+router.post("/sliders", authenticateAdmin, upload.single("image"), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "กรุณาอัปโหลดรูปภาพ" });
+        }
+
+        const fileName = `${Date.now()}-${req.file.originalname}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("sliders")
+            .upload(fileName, req.file.buffer, {
+                contentType: req.file.mimetype,
+                cacheControl: "3600",
+                upsert: false
+            });
+
+        if (uploadError) {
+            if (uploadError.message === "Bucket not found") {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: "🚨 Storage Bucket 'sliders' ยังไม่ได้สร้างใน Supabase Storage! กรุณาสร้าง Bucket ก่อน" 
+                });
+            }
+            throw uploadError;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+            .from("sliders")
+            .getPublicUrl(fileName);
+
+        const { data, error } = await supabase
+            .from("sliders")
+            .insert([{
+                image_url: publicUrl,
+                link_url: req.body.link_url || null,
+                order_index: req.body.order_index || 0,
+                created_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json({ success: true, message: "เพิ่มรูปภาพสไลเดอร์สำเร็จ", data });
+    } catch (err) {
+        console.error("❌ Slider Upload Error:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// DELETE /api/admin/sliders/:id
+router.get("/sliders/delete/:id", authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // 1. Get the image URL to delete from storage
+        const { data: slider, error: getError } = await supabase
+            .from("sliders")
+            .select("image_url")
+            .eq("id", id)
+            .single();
+
+        if (getError) throw getError;
+
+        if (slider && slider.image_url) {
+            const fileName = slider.image_url.split("/").pop();
+            await supabase.storage.from("sliders").remove([fileName]);
+        }
+
+        // 2. Delete from DB
+        const { error: deleteError } = await supabase
+            .from("sliders")
+            .delete()
+            .eq("id", id);
+
+        if (deleteError) throw deleteError;
+
+        res.json({ success: true, message: "ลบรูปภาพสไลเดอร์สำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ─── Discount Code Management ────────────────────────────────────────────────
+router.get("/discounts", authenticateAdmin, async (req, res) => {
+    try {
+        const { data, error } = await supabase.from("discount_codes").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        res.json({ success: true, data });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.post("/discounts", authenticateAdmin, async (req, res) => {
+    try {
+        const { code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active } = req.body;
+        const { data, error } = await supabase.from("discount_codes").insert([{
+            code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active
+        }]).select().single();
+        if (error) throw error;
+        res.json({ success: true, message: "สร้างโค้ดส่วนลดสำเร็จ", data });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.patch("/discounts/:id", authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { data, error } = await supabase.from("discount_codes").update({ ...req.body, updated_at: new Date() }).eq("id", id).select().single();
+        if (error) throw error;
+        res.json({ success: true, message: "อัปเดตโค้ดส่วนลดสำเร็จ", data });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.delete("/discounts/:id", authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { error } = await supabase.from("discount_codes").delete().eq("id", id);
+        if (error) throw error;
+        res.json({ success: true, message: "ลบโค้ดส่วนลดสำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 

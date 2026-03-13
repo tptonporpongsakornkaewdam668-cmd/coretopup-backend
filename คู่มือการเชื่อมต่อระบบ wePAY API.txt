@@ -1,0 +1,212 @@
+คู่มือการเชื่อมต่อระบบ wePAY API
+
+คู่มือนี้อธิบายขั้นตอนการเชื่อมต่อระบบเว็บไซต์กับ API ของ wePAY สำหรับการชำระบิล เติมเงินมือถือ และซื้อบัตรเติมเงินเกม ผ่าน REST API
+
+ระบบจะทำงานผ่าน HTTP POST API และใช้ Callback URL เพื่อส่งผลลัพธ์ของรายการกลับมายังเซิร์ฟเวอร์ของผู้ใช้งาน
+
+1. โครงสร้างการทำงานของระบบ
+
+ระบบ wePAY มีการทำงานหลัก 2 ส่วน
+
+1. การส่งคำสั่งชำระเงิน
+
+เว็บไซต์ของคุณส่งข้อมูลการชำระเงินไปยัง wePAY ผ่าน API
+
+2. การรับผลลัพธ์
+
+หลังจาก wePAY ทำรายการสำเร็จ ระบบจะส่งผลลัพธ์กลับมายัง
+
+resp_url (Callback URL)
+
+ที่คุณกำหนดไว้
+
+2. URL สำหรับเรียก API
+
+Endpoint หลัก
+
+https://www.wepay.in.th/client_api.json.php
+
+Method
+
+POST
+
+Content-Type
+
+application/json
+3. การตรวจสอบยอดเงินในระบบ
+
+ใช้สำหรับดูยอดเงินคงเหลือในบัญชี wePAY
+
+Request
+{
+"username":"YOUR_USERNAME",
+"password_hash":"MD5_PASSWORD",
+"type":"balance_inquiry"
+}
+ตัวอย่าง Response
+{
+"code":"00000",
+"ledger_balance":"299987.74",
+"available_balance":"299987.74"
+}
+4. ตรวจสอบข้อมูลบริการที่รองรับ
+
+ใช้เช็คว่าระบบรองรับบริการอะไร เช่น
+
+เติมเงินมือถือ
+
+จ่ายบิล
+
+บัตรเงินสด
+
+Request
+{
+"username":"YOUR_USERNAME",
+"password_hash":"MD5_PASSWORD",
+"type":"mtopup",
+"pay_to_company":"12CALL",
+"payee_info":"true"
+}
+Response
+{
+"code":"00000",
+"service_name":"AIS One-2-Call",
+"discount":3.5,
+"sof_min":5,
+"sof_max":1500
+}
+5. การสร้างรายการชำระเงิน
+Endpoint
+https://www.wepay.in.th/client_api.json.php
+Request ตัวอย่าง (เติมเงินมือถือ)
+{
+"username":"YOUR_USERNAME",
+"password_hash":"MD5_PASSWORD",
+"resp_url":"https://yourwebsite.com/wepay_callback.php",
+"dest_ref":"ORDER12345",
+"type":"mtopup",
+"pay_to_company":"12CALL",
+"pay_to_amount":"10",
+"pay_to_ref1":"0812345678"
+}
+ความหมายตัวแปร
+Parameter	ความหมาย
+username	Username wePAY
+password_hash	MD5(password)
+resp_url	URL สำหรับรับผลลัพธ์
+dest_ref	รหัสออเดอร์ของคุณ
+type	ประเภทบริการ
+pay_to_company	รหัสบริการ
+pay_to_amount	จำนวนเงิน
+pay_to_ref1	หมายเลขโทรศัพท์
+6. ผลตอบกลับหลังสร้างรายการ
+
+ตัวอย่าง
+
+{
+"bill_id":12345,
+"code":"00000",
+"transaction_id":1111111,
+"queue_id":900,
+"total_amount":9.65
+}
+
+หมายเหตุ
+
+รายการยัง ไม่เสร็จทันที
+
+ระบบจะใช้เวลา
+
+ประมาณ 1 - 5 นาที
+
+แล้วส่งผลลัพธ์ผ่าน Callback
+
+7. การรับ Callback จาก wePAY
+
+เมื่อทำรายการเสร็จ wePAY จะ POST มาที่
+
+resp_url
+รูปแบบข้อมูล
+dest_ref=ORDER123
+transaction_id=3871249
+status=2
+operator_trxnsid=1933602087
+sms=success message
+ความหมาย Status
+Status	ความหมาย
+2	สำเร็จ
+4	ล้มเหลว
+8. ตัวอย่าง Callback Script (PHP)
+<?php
+
+$dest_ref = $_POST['dest_ref'];
+$status = $_POST['status'];
+$transaction_id = $_POST['transaction_id'];
+
+if($status == 2){
+
+    // update order success
+
+    echo "SUCCEED|ORDER_ID=".$dest_ref;
+
+}else{
+
+    // update order failed
+
+    echo "ERROR|PAYMENT_FAILED";
+
+}
+
+?>
+
+สำคัญมาก
+Server ต้องตอบกลับ
+
+SUCCEED
+
+ไม่งั้น wePAY จะส่งข้อมูลซ้ำ
+
+9. ตรวจสอบสถานะย้อนหลัง
+
+ใช้เมื่อ Callback ไม่มา
+
+Request
+{
+"username":"YOUR_USERNAME",
+"password_hash":"MD5_PASSWORD",
+"type":"get_output",
+"transaction_id":"12345"
+}
+Response
+{
+"code":"00000",
+"output":"dest_ref=AA12345&status=2"
+}
+10. Status Code สำคัญ
+Code	ความหมาย
+00000	สำเร็จ
+20001	Username/Password ผิด
+20005	IP ไม่ได้รับอนุญาต
+30001	Company ไม่พบ
+30007	จำนวนเงินผิด
+30019	เงินในระบบไม่พอ
+11. การดึงเงินคืน (Refund)
+
+Endpoint
+
+https://www.wepay.in.th/mtopup_refund_api.php
+Request
+username=test
+password_hash=xxxxx
+transaction_id=123456
+resp_url=https://yourwebsite.com/refund_callback
+dest_ref=REF123
+pay_to_company=12CALL
+12. Flow การทำงานจริง
+
+1️⃣ ลูกค้ากดเติมเงินในเว็บ
+2️⃣ เว็บส่ง API ไป wePAY
+3️⃣ wePAY รับรายการ
+4️⃣ wePAY ติดต่อ Operator
+5️⃣ wePAY ส่ง Callback กลับ
+6️⃣ เว็บอัปเดตสถานะออเดอร์

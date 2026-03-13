@@ -27,14 +27,16 @@ router.get("/", authenticate, async (req, res) => {
             throw new Error("เกิดข้อผิดพลาดในการดึงประวัติทำรายการ");
         }
 
-        // รวมข้อมูลเพื่อให้ง่ายต่อการจัดการที่ Frontend
-        // คุณสามารถแยก tab หรือแสดงปนกันก็ได้ที่หน้า UI
+        const historyObj = {
+            purchases: orders || [],
+            topups: topups || []
+        };
+
+        console.log(`📜 [History] Found ${historyObj.purchases.length} purchases and ${historyObj.topups.length} topups for User: ${req.user.id}`);
+
         res.json({
             success: true,
-            data: {
-                purchases: orders,
-                topups: topups
-            }
+            data: historyObj
         });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
