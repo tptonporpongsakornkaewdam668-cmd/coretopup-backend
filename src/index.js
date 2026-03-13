@@ -69,6 +69,7 @@ app.use("/api/wepay-game", wepayRoutes);
 // Serve Static Admin Panel
 app.use("/admin", express.static(path.join(__dirname, "public/admin")));
 
+// Base API route
 app.get("/", (req, res) => {
   res.json({
     message: "🎮 GameTopUp API is running on Render!",
