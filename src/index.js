@@ -25,7 +25,12 @@ app.use(
   })
 );
 
-const devOrigins = ["http://localhost:5173", "http://localhost:3000", "http://localhost:5000"];
+const devOrigins = [
+  "http://localhost:5173", 
+  "http://localhost:3000", 
+  "http://localhost:5000",
+  "https://coinzonetopup.pages.dev" // เพิ่มโดเมนจริงเข้าไปในโค้ดเลยเพื่อความชัวร์
+];
 const envOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(o => o.trim()).filter(o => o.length > 0);
 const allowedOrigins = Array.from(new Set([...devOrigins, ...envOrigins]));
 
@@ -35,6 +40,7 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn(`⚠️ CORS Blocked: ${origin}`); // Log ดูว่าตัวไหนโดนบล็อก
         callback(null, false);
       }
     },
@@ -59,6 +65,9 @@ app.use("/api/peamsub", peamsubRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/history", historyRoutes);
 app.use("/api/wepay-game", wepayRoutes);
+
+// Serve Static Admin Panel
+app.use("/admin", express.static(path.join(__dirname, "public/admin")));
 
 app.get("/", (req, res) => {
   res.json({
