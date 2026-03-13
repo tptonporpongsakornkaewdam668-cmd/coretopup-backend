@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPTOPUP - NextGen Admin Control</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- ── LOGIN SCREEN ── -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="3" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+        </svg>
+        <span>GPTOPUP <small class="accent">ADMIN</small></span>
+      </div>
+      <h1>Welcome back</h1>
+      <p class="login-subtitle">System Administration & Control Center</p>
+
+      <div id="login-error" class="badge badge-danger hidden"
+        style="width:100%;margin-bottom:20px;justify-content:center"></div>
+
+      <form id="login-form" class="login-form">
+        <div class="form-group">
+          <label class="form-label">Administrator ID</label>
+          <input id="login-email" type="email" class="input-styled" placeholder="admin@gametopup.com"
+            value="admin@gametopup.com" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Access Key</label>
+          <input id="login-password" type="password" class="input-styled" placeholder="••••••••" value="admin1234"
+            required />
+        </div>
+        <button type="submit" class="btn btn-p" style="width:100%" id="login-btn">Secure Login</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── MAIN APP CORE ── -->
+  <div id="app" class="app hidden">
+
+    <!-- NAVIGATION BAR -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2.5" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+        </svg>
+        <span>GPTOPUP</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#dashboard" class="nav-item active" data-page="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span>Dashboard Overview</span>
+        </a>
+        <a href="#games" class="nav-item" data-page="games">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path
+              d="M6 12L3 9l3-3M18 12l3-3-3-3M3 9h18M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z">
+            </path>
+          </svg>
+          <span>Inventory & Pricing</span>
+        </a>
+        <a href="#orders" class="nav-item" data-page="orders">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"></path>
+            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+          </svg>
+          <span>Order Management</span>
+        </a>
+        <a href="#users" class="nav-item" data-page="users">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 110-8 4 4 0 010 8z"></path>
+            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"></path>
+          </svg>
+          <span>Customer Records</span>
+        </a>
+        <a href="#docs" class="nav-item" data-page="docs">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"></path>
+            <polyline points="13 2 13 9 20 9"></polyline>
+          </svg>
+          <span>API Infrastructure</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="admin-info">
+          <div class="admin-avatar">A</div>
+          <div>
+            <div class="admin-name" id="display-admin-email">Admin</div>
+            <div class="admin-role">System Root</div>
+          </div>
+        </div>
+        <button class="logout-btn" id="logout-btn" title="Sign Out">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"></path>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- CONTENT LAYER -->
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 class="page-title" id="current-page-title">Dashboard</h2>
+          <p class="page-subtitle" id="current-page-subtitle">Real-time system insights</p>
+        </div>
+        <div class="topbar-right">
+          <div id="server-status" class="badge badge-success">
+            <span class="status-dot"></span> System Live
+          </div>
+        </div>
+      </header>
+
+      <div class="content">
+
+        <!-- DASHBOARD -->
+        <div id="page-dashboard" class="page active">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-header">
+                <div class="stat-icon purple"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v20M2 12h20M12 2l-4 4M12 2l4 4M12 22l-4-4M12 22l4-4"></path>
+                  </svg></div>
+              </div>
+              <div class="stat-info">
+                <p class="stat-label">Total Users</p>
+                <h2 class="stat-value" id="stat-users">0</h2>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-header">
+                <div class="stat-icon blue"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
+                    </path>
+                  </svg></div>
+              </div>
+              <div class="stat-info">
+                <p class="stat-label">Total Orders</p>
+                <h2 class="stat-value" id="stat-orders">0</h2>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-header">
+                <div class="stat-icon green"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg></div>
+              </div>
+              <div class="stat-info">
+                <p class="stat-label">Completed</p>
+                <h2 class="stat-value" id="stat-revenue">0</h2>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-header">
+                <div class="stat-icon orange"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg></div>
+              </div>
+              <div class="stat-info">
+                <p class="stat-label">Pending</p>
+                <h2 class="stat-value" id="stat-pending">0</h2>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-main">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Live Transactions</h3>
+              </div>
+              <div class="table-container">
+                <table id="dash-orders-table">
+                  <thead>
+                    <tr>
+                      <th>Order ID</th>
+                      <th>Game</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-orders-tbody">
+                    <tr>
+                      <td colspan="4" style="text-align:center;padding:40px;color:var(--text-dim)">Initializing...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Infrastructure Health</h3>
+              </div>
+              <div id="status-bars" style="display:flex;flex-direction:column;gap:1.5rem">
+                <!-- Status items will be injected -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GAMES PAGE -->
+        <div id="page-games" class="page">
+          <div class="card-header" style="margin-bottom:32px">
+            <p id="games-count" class="badge badge-info">Calculating game inventory...</p>
+            <input type="text" id="game-search" class="input-styled" style="width:300px"
+              placeholder="Search catalog..." />
+          </div>
+          <div id="games-grid" class="games-grid">
+            <!-- Game cards injected via JS -->
+          </div>
+        </div>
+
+        <!-- ORDERS PAGE -->
+        <div id="page-orders" class="page">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Transaction Ledger</h3>
+              <div style="display:flex;gap:12px">
+                <select id="order-filter-status" class="input-styled" style="width:180px">
+                  <option value="">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="processing">Processing</option>
+                  <option value="success">Success</option>
+                  <option value="completed">Completed</option>
+                  <option value="failed">Failed</option>
+                </select>
+                <input type="text" id="order-search" class="input-styled" style="width:250px"
+                  placeholder="Filter by ID/Game..." />
+              </div>
+            </div>
+            <div class="table-container">
+              <table id="orders-table">
+                <thead>
+                  <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Product</th>
+                    <th>Reference</th>
+                    <th>Status</th>
+                    <th>Timestamp</th>
+                    <th>Manage</th>
+                  </tr>
+                </thead>
+                <tbody id="orders-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- USERS PAGE -->
+        <div id="page-users" class="page">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Global User Directory</h3>
+            </div>
+            <div class="table-container">
+              <table id="users-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Profile</th>
+                    <th>Email Address</th>
+                    <th>Balance</th>
+                    <th>Registration</th>
+                  </tr>
+                </thead>
+                <tbody id="users-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- API DOCS PAGE -->
+        <div id="page-docs" class="page">
+          <div id="api-docs-content" class="api-docs">
+            <!-- Docs injected via JS -->
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ── MODALS LAYER ── -->
+
+  <!-- PRICE OVERRIDE MODAL -->
+  <div id="price-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="price-modal-title">Pricing Engine</h3>
+        <p class="modal-desc" id="price-modal-subtitle">Package ID: LOADING</p>
+      </div>
+
+      <div class="group-row">
+        <div class="form-group">
+          <label class="form-label">Provider Base (฿)</label>
+          <input id="price-modal-original" type="number" disabled class="input-styled" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Internal Cost (฿)</label>
+          <input id="price-modal-cost" type="number" step="0.01" class="input-styled" placeholder="0.00" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Active Selling Price (฿)</label>
+        <input id="price-modal-selling" type="number" step="0.01" class="input-styled" />
+      </div>
+
+      <div
+        style="background: rgba(124, 58, 237, 0.05); padding: 24px; border-radius: 16px; border: 1px dashed var(--primary); margin-top: 24px">
+        <h4 style="font-size:14px; color:var(--primary); margin-bottom:16px; display:flex; align-items:center; gap:8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path
+              d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41">
+            </path>
+          </svg>
+          Promotion Engine
+        </h4>
+        <div class="form-group">
+          <label class="form-label">Sale Price (฿)</label>
+          <input id="price-modal-discount" type="number" step="0.01" placeholder="Disabled" class="input-styled" />
+        </div>
+        <div class="group-row">
+          <div class="form-group">
+            <label class="form-label">Activation</label>
+            <input id="price-modal-start" type="datetime-local" class="input-styled" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Expiry</label>
+            <input id="price-modal-end" type="datetime-local" class="input-styled" />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="price-modal-cancel" class="btn btn-s">Cancel</button>
+        <button id="price-modal-confirm" class="btn btn-p">Commit Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME SETTINGS MODAL -->
+  <div id="game-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:440px">
+      <div class="modal-header">
+        <h3 class="modal-title">ปรับแต่งค่ายเกม</h3>
+        <p class="modal-desc" id="game-modal-id">Company ID: -</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">ชื่อค่ายเกม (แสดงหน้าเว็บ)</label>
+        <input id="game-modal-name" type="text" class="input-styled" placeholder="เช่น Garena ROV" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">URL รูปภาพหน้าปก</label>
+        <input id="game-modal-image" type="text" class="input-styled" placeholder="https://example.com/image.png" />
+        <p class="text-xs opacity-50 mt-2">ภาพแนะนำ: สี่เหลี่ยมจัตุรัส 512x512px</p>
+      </div>
+
+      <div id="game-modal-preview"
+        style="width:100%; height:120px; border-radius:12px; background:var(--card); display:flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid var(--border)">
+        <span class="text-dim text-xs">Image Preview</span>
+      </div>
+
+      <div class="modal-footer">
+        <button id="game-modal-cancel" class="btn btn-s">ยกเลิก</button>
+        <button id="game-modal-confirm" class="btn btn-p">อัปเดตข้อมูล</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATUS UPDATE MODAL -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content" style="max-width:400px">
+      <div class="modal-header">
+        <h3 class="modal-title">Modify Status</h3>
+        <p class="modal-desc" id="modal-order-id">#ORD-XXXX</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">New State</label>
+        <select id="modal-status" class="input-styled">
+          <option value="pending">⏳ Pending</option>
+          <option value="processing">🔄 Processing</option>
+          <option value="success">✅ Success</option>
+          <option value="completed">✅ Completed</option>
+          <option value="failed">❌ Failed</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-cancel" class="btn btn-s">Discard</button>
+        <button id="modal-confirm" class="btn btn-p">Apply Status</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BALANCE MODAL -->
+  <div id="balance-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:400px">
+      <div class="modal-header">
+        <h3 class="modal-title" id="balance-modal-title">Wallet Adjustment</h3>
+        <p class="modal-desc" id="balance-modal-current">Profile: LOADING</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Set Absolute Balance (฿)</label>
+        <input id="balance-modal-amount" type="number" min="0" step="0.01" class="input-styled" />
+      </div>
+      <div class="modal-footer">
+        <button id="balance-modal-cancel" class="btn btn-s">Cancel</button>
+        <button id="balance-modal-confirm" class="btn btn-p">Save Balance</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast hidden"
+    style="position:fixed;bottom:30px;right:30px;z-index:9999;padding:16px 24px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text-main);box-shadow:var(--shadow-md);transform:translateY(100px);opacity:0;transition:all 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)">
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
