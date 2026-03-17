@@ -345,9 +345,9 @@ router.get("/discounts", authenticateAdmin, async (req, res) => {
 
 router.post("/discounts", authenticateAdmin, async (req, res) => {
     try {
-        const { code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active } = req.body;
+        const { code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active, title, description, image_url } = req.body;
         const { data, error } = await supabase.from("discount_codes").insert([{
-            code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active
+            code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active, title, description, image_url
         }]).select().single();
         if (error) throw error;
         res.json({ success: true, message: "สร้างโค้ดส่วนลดสำเร็จ", data });

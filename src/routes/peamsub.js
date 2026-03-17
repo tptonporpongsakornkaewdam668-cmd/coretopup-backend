@@ -4,8 +4,10 @@ const { authenticate } = require("../middleware/auth");
 const { updateBalance, getBalance } = require("../services/wallet");
 const { supabase } = require("../db");
 const { v4: uuidv4 } = require("uuid");
+const { getCached } = require("../services/cache");
 
 const router = express.Router();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
  * ทุกครั้งที่ Frontend ร้องขอสินค้า จะผ่านหน้านี้ ทำให้ API Key ของ Peamsub ปลอดภัยไม่รั่วไหล
@@ -17,27 +19,39 @@ router.get("/user/inquiry", authenticate, async (req, res) => {
     res.status(result.statusCode).json(result.data);
 });
 
-// 2. ดึงรายการแอพพรีเมียม (Premium Apps)
+// 2. ดึงรายการแอพพรีเมียม (Premium Apps) - cached
 router.get("/app-premium", async (req, res) => {
-    const result = await peamsubRequest("/v2/app-premium");
+    const result = await getCached("peamsub:app-premium",
+        () => peamsubRequest("/v2/app-premium"),
+        CACHE_TTL
+    );
     res.status(result.statusCode).json(result.data);
 });
 
-// 3. ดึงรายการเติมเกม (Game Products - Peamsub Version)
+// 3. ดึงรายการเติมเกม (Game Products) - cached
 router.get("/game", async (req, res) => {
-    const result = await peamsubRequest("/v2/game");
+    const result = await getCached("peamsub:game",
+        () => peamsubRequest("/v2/game"),
+        CACHE_TTL
+    );
     res.status(result.statusCode).json(result.data);
 });
 
-// 4. ดึงรายการบัตรเงินสด (Cash Cards)
+// 4. ดึงรายการบัตรเงินสด - cached
 router.get("/cashcard", async (req, res) => {
-    const result = await peamsubRequest("/v2/cashcard");
+    const result = await getCached("peamsub:cashcard",
+        () => peamsubRequest("/v2/cashcard"),
+        CACHE_TTL
+    );
     res.status(result.statusCode).json(result.data);
 });
 
-// 5. ดึงรายการเติมเงิน/เน็ตมือถือ (Mobile Products)
+// 5. ดึงรายการเติมเงิน/เน็ตมือถือ - cached
 router.get("/mobile", async (req, res) => {
-    const result = await peamsubRequest("/v2/mobile");
+    const result = await getCached("peamsub:mobile",
+        () => peamsubRequest("/v2/mobile"),
+        CACHE_TTL
+    );
     res.status(result.statusCode).json(result.data);
 });
 

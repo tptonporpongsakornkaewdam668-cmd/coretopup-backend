@@ -15,6 +15,7 @@ const paymentRoutes = require("./routes/payment");
 const historyRoutes = require("./routes/history");
 const wepayRoutes = require("./routes/wepay");
 const slidersRoutes = require("./routes/sliders");
+const discountsRoutes = require("./routes/discounts");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -67,6 +68,7 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/history", historyRoutes);
 app.use("/api/wepay-game", wepayRoutes);
 app.use("/api/sliders", slidersRoutes);
+app.use("/api/discounts", discountsRoutes);
 
 // Serve Static Admin Panel
 const adminPath = path.join(__dirname, "public", "admin");

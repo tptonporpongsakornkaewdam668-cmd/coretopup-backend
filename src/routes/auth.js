@@ -59,7 +59,7 @@ router.post("/register", authLimiter, registerRules, async (req, res) => {
         success: true,
         message: "สมัครสมาชิกสำเร็จ",
         token,
-        user: { id: newUser.id, username: newUser.username, email: newUser.email, balance: 0 },
+        user: { id: newUser.id, username: newUser.username, email: newUser.email, balance: 0, points: 0 },
     });
 });
 
@@ -96,7 +96,7 @@ router.post("/login", authLimiter, loginRules, async (req, res) => {
         success: true,
         message: "เข้าสู่ระบบสำเร็จ",
         token,
-        user: { id: user.id, username: user.username, email: user.email, balance: user.balance || 0 },
+        user: { id: user.id, username: user.username, email: user.email, balance: user.balance || 0, points: user.points || 0 },
     });
 });
 
@@ -104,7 +104,7 @@ router.post("/login", authLimiter, loginRules, async (req, res) => {
 router.get("/me", authenticate, async (req, res) => {
     const { data: user, error } = await supabase
         .from("users")
-        .select("id, username, email, balance, created_at")
+        .select("id, username, email, balance, points, created_at")
         .eq("id", req.user.id)
         .single();
 

@@ -4,9 +4,10 @@ const { authenticate } = require("../middleware/auth");
 const { updateBalance, getBalance } = require("../services/wallet");
 const { supabase } = require("../db");
 const { v4: uuidv4 } = require("uuid");
+const { getCached, invalidate } = require("../services/cache");
 
 const router = express.Router();
-
+const WEPAY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
  * wePAY Game API - Main Endpoint
@@ -14,80 +15,76 @@ const router = express.Router();
 router.post("/", async (req, res) => {
     const { action, ...params } = req.body;
 
-    // 1. ดึงรายการเกม (game_list) - ผสมข้อมูลราคาขาย/ส่วนลดจาก DB
+    // 1. game_list - cached 5 min
     if (action === "game_list") {
         try {
-            const result = await getWepayProductList();
-            if (result.statusCode !== 200) return res.status(result.statusCode).json(result.data);
+            const formatted = await getCached("wepay:game_list", async () => {
+                const result = await getWepayProductList();
+                if (result.statusCode !== 200) throw new Error(result.data?.message || "wePAY error");
 
-            const rawData = result.data.data || {};
-            const gameItems = rawData.gtopup || [];
+                const rawData = result.data.data || {};
+                const gameItems = rawData.gtopup || [];
 
-            // ดึงการตั้งค่าราคาจาก DB
-            const { data: overrides } = await supabase.from("product_overrides").select("*");
-            const overrideMap = {};
-            overrides?.forEach(o => {
-                overrideMap[`${o.company_id}_${o.original_price}`] = o;
-            });
+                const { data: overrides } = await supabase.from("product_overrides").select("*");
+                const overrideMap = {};
+                overrides?.forEach(o => { overrideMap[`${o.company_id}_${o.original_price}`] = o; });
 
-            // ดึงการตั้งค่าภาพและชื่อเกมจาก DB
-            const { data: gameSettings } = await supabase.from("game_settings").select("*");
-            const settingsMap = {};
-            gameSettings?.forEach(s => { settingsMap[s.company_id] = s; });
+                const { data: gameSettings } = await supabase.from("game_settings").select("*");
+                const settingsMap = {};
+                gameSettings?.forEach(s => { settingsMap[s.company_id] = s; });
 
-            const formatted = [];
-            const now = new Date();
+                const formatted = [];
+                const now = new Date();
 
-            gameItems.forEach(game => {
-                const setting = settingsMap[game.company_id];
-                const displayName = setting?.custom_name || game.company_name;
-                const displayImg = setting?.custom_image_url || game.img || null;
+                gameItems.forEach(game => {
+                    const setting = settingsMap[game.company_id];
+                    const displayName = setting?.custom_name || game.company_name;
+                    const displayImg = setting?.custom_image_url || game.img || null;
 
-                if (game.denomination && Array.isArray(game.denomination)) {
-                    game.denomination.forEach(denom => {
-                        const basePrice = parseFloat(denom.price || 0);
-                        const override = overrideMap[`${game.company_id}_${basePrice}`];
+                    if (game.denomination && Array.isArray(game.denomination)) {
+                        game.denomination.forEach(denom => {
+                            const basePrice = parseFloat(denom.price || 0);
+                            const override = overrideMap[`${game.company_id}_${basePrice}`];
 
-                        let finalPrice = basePrice;
-                        let isDiscounted = false;
+                            let finalPrice = basePrice;
+                            let isDiscounted = false;
 
-                        if (override) {
-                            // ใช้ราคาที่แอดมินตั้งไว้
-                            finalPrice = parseFloat(override.selling_price || basePrice);
-
-                            // เช็คส่วนลด (ถ้ามีและอยู่ในช่วงเวลา)
-                            if (override.discount_price && override.discount_start && override.discount_end) {
-                                const start = new Date(override.discount_start);
-                                const end = new Date(override.discount_end);
-                                if (now >= start && now <= end) {
-                                    finalPrice = parseFloat(override.discount_price);
-                                    isDiscounted = true;
+                            if (override) {
+                                finalPrice = parseFloat(override.selling_price || basePrice);
+                                if (override.discount_price && override.discount_start && override.discount_end) {
+                                    const start = new Date(override.discount_start);
+                                    const end = new Date(override.discount_end);
+                                    if (now >= start && now <= end) {
+                                        finalPrice = parseFloat(override.discount_price);
+                                        isDiscounted = true;
+                                    }
                                 }
                             }
-                        }
 
-                        const cleanDesc = denom.description
-                            ? denom.description.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()
-                            : '';
+                            const cleanDesc = denom.description
+                                ? denom.description.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()
+                                : '';
 
-                        formatted.push({
-                            id: game.company_id,
-                            original_id: game.company_id,
-                            name: `${displayName} - ${cleanDesc || (denom.price + ' บาท')}`,
-                            price: finalPrice,
-                            base_price: basePrice,
-                            cost: override?.cost_price || null,
-                            category: displayName,
-                            img: displayImg || null,
-                            des: cleanDesc,
-                            type: 'gtopup',
-                            is_discount: isDiscounted,
-                            override_data: override || null,
-                            setting_data: setting || null
+                            formatted.push({
+                                id: game.company_id,
+                                original_id: game.company_id,
+                                name: `${displayName} - ${cleanDesc || (denom.price + ' บาท')}`,
+                                price: finalPrice,
+                                base_price: basePrice,
+                                cost: override?.cost_price || null,
+                                category: displayName,
+                                img: displayImg || null,
+                                des: cleanDesc,
+                                type: 'gtopup',
+                                is_discount: isDiscounted,
+                                override_data: override || null,
+                                setting_data: setting || null
+                            });
                         });
-                    });
-                }
-            });
+                    }
+                });
+                return formatted;
+            }, WEPAY_CACHE_TTL);
 
             return res.json({ statusCode: 200, data: formatted });
         } catch (error) {
@@ -96,69 +93,70 @@ router.post("/", async (req, res) => {
         }
     }
 
-    // 1.5. ดึงรายการบัตรเงินสด/Gift Card (cashcard_list) - ดึงจาก rawData.cashcard โดยตรง
+    // 1.5 cashcard_list - cached 5 min
     if (action === "cashcard_list") {
         try {
-            const result = await getWepayProductList();
-            if (result.statusCode !== 200) return res.status(result.statusCode).json(result.data);
+            const formatted = await getCached("wepay:cashcard_list", async () => {
+                const result = await getWepayProductList();
+                if (result.statusCode !== 200) throw new Error(result.data?.message || "wePAY error");
 
-            const rawData = result.data.data || {};
-            const cashcardItems = rawData.cashcard || []; // ✅ ใช้ array cashcard โดยตรง
+                const rawData = result.data.data || {};
+                const cashcardItems = rawData.cashcard || [];
 
-            const { data: overrides } = await supabase.from("product_overrides").select("*");
-            const overrideMap = {};
-            overrides?.forEach(o => { overrideMap[`${o.company_id}_${o.original_price}`] = o; });
+                const { data: overrides } = await supabase.from("product_overrides").select("*");
+                const overrideMap = {};
+                overrides?.forEach(o => { overrideMap[`${o.company_id}_${o.original_price}`] = o; });
 
-            const { data: gameSettings } = await supabase.from("game_settings").select("*");
-            const settingsMap = {};
-            gameSettings?.forEach(s => { settingsMap[s.company_id] = s; });
+                const { data: gameSettings } = await supabase.from("game_settings").select("*");
+                const settingsMap = {};
+                gameSettings?.forEach(s => { settingsMap[s.company_id] = s; });
 
-            const formatted = [];
-            const now = new Date();
+                const formatted = [];
+                const now = new Date();
 
-            cashcardItems.forEach(card => {
-                const setting = settingsMap[card.company_id];
-                const displayName = setting?.custom_name || card.company_name;
-                const displayImg = setting?.custom_image_url || card.img || null;
+                cashcardItems.forEach(card => {
+                    const setting = settingsMap[card.company_id];
+                    const displayName = setting?.custom_name || card.company_name;
+                    const displayImg = setting?.custom_image_url || card.img || null;
 
-                if (card.denomination && Array.isArray(card.denomination)) {
-                    card.denomination.forEach(denom => {
-                        const basePrice = parseFloat(denom.price || 0);
-                        const override = overrideMap[`${card.company_id}_${basePrice}`];
+                    if (card.denomination && Array.isArray(card.denomination)) {
+                        card.denomination.forEach(denom => {
+                            const basePrice = parseFloat(denom.price || 0);
+                            const override = overrideMap[`${card.company_id}_${basePrice}`];
 
-                        let finalPrice = basePrice;
-                        let isDiscounted = false;
-                        if (override) {
-                            finalPrice = parseFloat(override.selling_price || basePrice);
-                            if (override.discount_price && override.discount_start && override.discount_end) {
-                                const start = new Date(override.discount_start);
-                                const end = new Date(override.discount_end);
-                                if (now >= start && now <= end) { finalPrice = parseFloat(override.discount_price); isDiscounted = true; }
+                            let finalPrice = basePrice;
+                            let isDiscounted = false;
+                            if (override) {
+                                finalPrice = parseFloat(override.selling_price || basePrice);
+                                if (override.discount_price && override.discount_start && override.discount_end) {
+                                    const start = new Date(override.discount_start);
+                                    const end = new Date(override.discount_end);
+                                    if (now >= start && now <= end) { finalPrice = parseFloat(override.discount_price); isDiscounted = true; }
+                                }
                             }
-                        }
 
-                        // แปลง description จาก HTML เป็น plain text
-                        const cleanDesc = denom.description
-                            ? denom.description.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()
-                            : `${basePrice} บาท`;
+                            const cleanDesc = denom.description
+                                ? denom.description.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()
+                                : `${basePrice} บาท`;
 
-                        formatted.push({
-                            id: card.company_id,
-                            original_id: card.company_id,
-                            name: `${displayName} ${basePrice} บาท`,
-                            price: finalPrice,
-                            base_price: basePrice,
-                            category: displayName,
-                            description: cleanDesc,
-                            img: displayImg || null,
-                            type: 'cashcard',
-                            is_discount: isDiscounted,
+                            formatted.push({
+                                id: card.company_id,
+                                original_id: card.company_id,
+                                name: `${displayName} ${basePrice} บาท`,
+                                price: finalPrice,
+                                base_price: basePrice,
+                                category: displayName,
+                                description: cleanDesc,
+                                img: displayImg || null,
+                                type: 'cashcard',
+                                is_discount: isDiscounted,
+                            });
                         });
-                    });
-                }
-            });
+                    }
+                });
+                return formatted;
+            }, WEPAY_CACHE_TTL);
 
-            console.log(`✅ CashCard list: ${formatted.length} items from ${cashcardItems.length} cards`);
             return res.json({ statusCode: 200, data: formatted });
         } catch (error) {
             console.error("❌ CashCard List Error:", error);
@@ -228,7 +226,7 @@ router.post("/", async (req, res) => {
             let currentStep = "initializing";
             try {
                 let { productId, reference, payload } = params;
-                const { playerId, server, promoCode } = payload || {};
+                const { playerId, server, promoCode, usePoints } = payload || {};
 
                 // Fallback: ดึงข้อมูล productId จากตำแหน่งที่มีโอกาสเป็นไปได้มากที่สุด
                 productId = productId || payload?.productId || payload?.company_id || payload?.id;
@@ -254,6 +252,13 @@ router.post("/", async (req, res) => {
                 }
 
                 currentStep = "checking_prices_and_settings";
+                // 🔍 0. ดึงการตั้งค่าระบบ
+                const { data: sData } = await supabase.from("system_settings").select("*");
+                const sysConfig = (sData || []).reduce((acc, curr) => {
+                    acc[curr.key] = curr.value;
+                    return acc;
+                }, {});
+
                 // 🔍 1. ตรวจสอบการ Override ราคา
                 const { data: override } = await supabase
                     .from("product_overrides")
@@ -307,7 +312,19 @@ router.post("/", async (req, res) => {
                     }
                 }
                 
-                const finalAmount = Math.max(0, expectedPrice - discountAmount);
+                // 🔍 1.6 ตรวจสอบการใช้แต้ม (Redeem Points)
+                let pointDiscount = 0;
+                let usedPointsCount = 0;
+                const { data: uPointsData } = await supabase.from("users").select("points").eq("id", req.user.id).single();
+                const userPoints = uPointsData?.points || 0;
+
+                if (usePoints && userPoints > 0) {
+                    const redeemRate = parseFloat(sysConfig.point_redeem_rate || 0.1);
+                    pointDiscount = userPoints * redeemRate;
+                    usedPointsCount = userPoints;
+                }
+
+                const finalAmount = Math.max(0, expectedPrice - discountAmount - pointDiscount);
                 
                 // 🔍 2. ดึงชื่อเกมและการตั้งค่า
                 const { data: gSetting } = await supabase
@@ -316,13 +333,6 @@ router.post("/", async (req, res) => {
                     .maybeSingle();
 
                 const gameDisplayName = gSetting?.custom_name || (payload.name ? payload.name.split('-')[0].trim() : "wePAY Game");
-
-                // 🔍 2.5 ดึงการตั้งค่าแต้ม
-                const { data: sData } = await supabase.from("system_settings").select("*");
-                const sysConfig = (sData || []).reduce((acc, curr) => {
-                    acc[curr.key] = curr.value;
-                    return acc;
-                }, {});
 
                 const earnThreshold = parseFloat(sysConfig.point_earn_threshold || 100);
                 const earnRate = parseFloat(sysConfig.point_earn_rate || 1);
@@ -335,9 +345,16 @@ router.post("/", async (req, res) => {
                     return res.status(400).json({ success: false, message: `ยอดเงินไม่เพียงพอ (คงเหลือ: ${currentBalance.toFixed(2)} บาท)` });
                 }
 
-                currentStep = "deducting_balance";
-                // 💰 4. หักเงิน
-                await updateBalance(req.user.id, -finalAmount, `จ่าย: ${gameDisplayName} [${productId}]`);
+                currentStep = "deducting_balance_and_points";
+                // 💰 4. หักเงินและยอดแต้ม
+                await updateBalance(req.user.id, -finalAmount, `จ่าย: ${gameDisplayName} [${productId}]${usePoints ? ' (ใช้แต้ม)' : ''}`);
+                
+                if (usedPointsCount > 0) {
+                    await supabase.rpc('decrement_points', { user_id: req.user.id, amount: usedPointsCount });
+                    // If RPC not exists, use standard update
+                    const { error: pErr } = await supabase.from("users").update({ points: 0 }).eq("id", req.user.id);
+                    if (pErr) console.error("❌ Point Deduction Error:", pErr);
+                }
 
                 currentStep = "calling_wepay_api";
                 // 🚀 5. ส่งคำสั่งไป wePAY
