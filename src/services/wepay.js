@@ -19,8 +19,14 @@ async function wepayRequest(payload) {
         ...payload
     };
 
-    const headers = { "Content-Type": "application/json" };
-    return proxyRequest(WEPAY_API_URL, "POST", headers, body);
+    const headers = { "Content-Type": "application/x-www-form-urlencoded" };
+    
+    // แปลง Body เป็น Form Data String
+    const formBody = Object.keys(body)
+        .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(body[key]))
+        .join('&');
+
+    return proxyRequest(WEPAY_API_URL, "POST", headers, formBody);
 }
 
 /**
