@@ -25,11 +25,11 @@ router.post("/", async (req, res) => {
                 const rawData = result.data.data || {};
                 const gameItems = rawData.gtopup || [];
 
-                const { data: overrides } = await supabase.from("product_overrides").select("*");
+                const { rows: overrides } = await db.execute("SELECT * FROM product_overrides");
                 const overrideMap = {};
                 overrides?.forEach(o => { overrideMap[`${o.company_id}_${o.original_price}`] = o; });
 
-                const { data: gameSettings } = await supabase.from("game_settings").select("*");
+                const { rows: gameSettings } = await db.execute("SELECT * FROM game_settings");
                 const settingsMap = {};
                 gameSettings?.forEach(s => { settingsMap[s.company_id] = s; });
 
@@ -103,11 +103,11 @@ router.post("/", async (req, res) => {
                 const rawData = result.data.data || {};
                 const cashcardItems = rawData.cashcard || [];
 
-                const { data: overrides } = await supabase.from("product_overrides").select("*");
+                const { rows: overrides } = await db.execute("SELECT * FROM product_overrides");
                 const overrideMap = {};
                 overrides?.forEach(o => { overrideMap[`${o.company_id}_${o.original_price}`] = o; });
 
-                const { data: gameSettings } = await supabase.from("game_settings").select("*");
+                const { rows: gameSettings } = await db.execute("SELECT * FROM game_settings");
                 const settingsMap = {};
                 gameSettings?.forEach(s => { settingsMap[s.company_id] = s; });
 
@@ -182,14 +182,13 @@ router.post("/", async (req, res) => {
         if (!code) return res.status(400).json({ success: false, message: "Missing code" });
 
         try {
-            const { data: discount, error } = await supabase
-                .from("discount_codes")
-                .select("*")
-                .eq("code", code.toUpperCase())
-                .eq("is_active", true)
-                .maybeSingle();
+            const result = await db.execute({
+                sql: "SELECT * FROM discount_codes WHERE code = ? AND is_active = 1 LIMIT 1",
+                args: [code.toUpperCase()]
+            });
+            const discount = result.rows[0];
 
-            if (error || !discount) return res.status(404).json({ success: false, message: "ไม่พบโค้ดส่วนลดนี้ หรือโค้ดหมดอายุแล้ว" });
+            if (!discount) return res.status(404).json({ success: false, message: "ไม่พบโค้ดส่วนลดนี้ หรือโค้ดหมดอายุแล้ว" });
 
             const now = new Date();
             if (discount.end_date && now > new Date(discount.end_date)) {
@@ -244,28 +243,28 @@ router.post("/", async (req, res) => {
                 }
 
                 currentStep = "fetching_user_info";
-                // ดึงอีเมลผู้ใช้หากใน req.user ไม่มี (เพื่อบันทึกลง orders table)
-                let userEmail = req.user.email;
-                if (!userEmail) {
-                    const { data: uData } = await supabase.from("users").select("email").eq("id", req.user.id).single();
-                    userEmail = uData?.email || "unknown@user.com";
-                }
+                const { rows: uRows } = await db.execute({
+                    sql: "SELECT email, points FROM users WHERE id = ? LIMIT 1",
+                    args: [req.user.id]
+                });
+                const userData = uRows[0];
+                const userEmail = userData?.email || "unknown@user.com";
+                const userPoints = userData?.points || 0;
 
                 currentStep = "checking_prices_and_settings";
                 // 🔍 0. ดึงการตั้งค่าระบบ
-                const { data: sData } = await supabase.from("system_settings").select("*");
-                const sysConfig = (sData || []).reduce((acc, curr) => {
+                const { rows: sRows } = await db.execute("SELECT * FROM system_settings");
+                const sysConfig = (sRows || []).reduce((acc, curr) => {
                     acc[curr.key] = curr.value;
                     return acc;
                 }, {});
 
                 // 🔍 1. ตรวจสอบการ Override ราคา
-                const { data: override } = await supabase
-                    .from("product_overrides")
-                    .select("*")
-                    .eq("company_id", productId)
-                    .eq("original_price", basePrice)
-                    .maybeSingle();
+                const { rows: ovRows } = await db.execute({
+                    sql: "SELECT * FROM product_overrides WHERE company_id = ? AND original_price = ? LIMIT 1",
+                    args: [productId, basePrice]
+                });
+                const override = ovRows[0];
 
                 let expectedPrice = basePrice;
                 const now = new Date();
@@ -286,12 +285,11 @@ router.post("/", async (req, res) => {
                 let appliedPromo = null;
 
                 if (promoCode) {
-                    const { data: discount } = await supabase
-                        .from("discount_codes")
-                        .select("*")
-                        .eq("code", promoCode.toUpperCase())
-                        .eq("is_active", true)
-                        .maybeSingle();
+                    const { rows: prRows } = await db.execute({
+                        sql: "SELECT * FROM discount_codes WHERE code = ? AND is_active = 1 LIMIT 1",
+                        args: [promoCode.toUpperCase()]
+                    });
+                    const discount = prRows[0];
 
                     if (discount) {
                         const isExpired = discount.end_date && now > new Date(discount.end_date);
@@ -315,8 +313,6 @@ router.post("/", async (req, res) => {
                 // 🔍 1.6 ตรวจสอบการใช้แต้ม (Redeem Points)
                 let pointDiscount = 0;
                 let usedPointsCount = 0;
-                const { data: uPointsData } = await supabase.from("users").select("points").eq("id", req.user.id).single();
-                const userPoints = uPointsData?.points || 0;
 
                 if (usePoints && userPoints > 0) {
                     const redeemRate = parseFloat(sysConfig.point_redeem_rate || 0.1);
@@ -327,12 +323,11 @@ router.post("/", async (req, res) => {
                 const finalAmount = Math.max(0, expectedPrice - discountAmount - pointDiscount);
                 
                 // 🔍 2. ดึงชื่อเกมและการตั้งค่า
-                const { data: gSetting } = await supabase
-                    .from("game_settings")
-                    .select("*")
-                    .eq("company_id", productId)
-                    .maybeSingle();
-
+                const { rows: gsRows } = await db.execute({
+                    sql: "SELECT * FROM game_settings WHERE company_id = ? LIMIT 1",
+                    args: [productId]
+                });
+                const gSetting = gsRows[0];
                 const gameDisplayName = gSetting?.custom_name || (payload.name ? payload.name.split('-')[0].trim() : "wePAY Game");
 
                 const earnThreshold = parseFloat(sysConfig.point_earn_threshold || 100);
@@ -351,15 +346,15 @@ router.post("/", async (req, res) => {
                 await updateBalance(req.user.id, -finalAmount, `จ่าย: ${gameDisplayName} [${productId}]${usePoints ? ' (ใช้แต้ม)' : ''}`);
                 
                 if (usedPointsCount > 0) {
-                    // Using standard update instead of RPC to avoid "function not found" errors
-                    const { error: pErr } = await supabase.from("users").update({ points: 0 }).eq("id", req.user.id);
-                    if (pErr) console.error("❌ Point Deduction Error:", pErr);
+                    await db.execute({
+                        sql: "UPDATE users SET points = 0 WHERE id = ?",
+                        args: [req.user.id]
+                    });
                 }
 
                 currentStep = "calling_wepay_api";
                 // 🚀 5. ส่งคำสั่งไป wePAY
-                // Ensure the callback URL is correct (pointing to this router's callback endpoint)
-                const baseUrl = process.env.WEPAY_CALLBACK_URL || "https://www.baimonshop.com/api/wepay-game/callback";
+                const baseUrl = process.env.WEPAY_CALLBACK_URL || "https://api.coinzonetopup.shop/api/wepay-game/callback";
                 const wepayBody = {
                     type: payload.type || "gtopup",
                     pay_to_company: productId,
@@ -377,40 +372,30 @@ router.post("/", async (req, res) => {
 
                 currentStep = "saving_order_to_db";
                 // 📝 6. บันทึกประวัติการสั่งซื้อ
-                const newOrder = {
-                    id: uuidv4(),
-                    user_id: req.user.id,
-                    user_email: userEmail,
-                    game_id: String(productId),
-                    game_slug: `wepay-${productId}`,
-                    game_name: gameDisplayName,
-                    package_id: String(productId),
-                    package_name: payload.name || productId,
-                    package_price: finalAmount,
-                    player_id: String(playerId),
-                    server: server || "-",
-                    payment_method: "wallet",
-                    status: result.statusCode === 200 ? "processing" : "failed",
-                    reference: reference,
-                    earned_points: earnedPoints,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                };
-
-                // หากมีโค้ดส่วนลด ให้บันทึกลง Order ด้วย (ถ้าตารางรองรับ)
-                newOrder.discount_amount = discountAmount;
-                newOrder.promo_code = promoCode || null;
-
-                const { error: dbError } = await supabase.from("orders").insert([newOrder]);
-                if (dbError) {
-                    console.error("❌ Supabase DB Insert Error:", dbError.message);
-                }
+                const orderId = uuidv4();
+                await db.execute({
+                    sql: `INSERT INTO orders (id, user_id, product_id, product_name, player_id, server, amount, status, transaction_id, provider, created_at)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                    args: [
+                        orderId, 
+                        req.user.id, 
+                        String(productId), 
+                        gameDisplayName, 
+                        String(playerId), 
+                        server || "-", 
+                        finalAmount, 
+                        result.statusCode === 200 ? "processing" : "failed",
+                        reference,
+                        "wepay"
+                    ]
+                });
 
                 // สรุปการใช้โค้ดส่วนลดใน DB
                 if (appliedPromo) {
-                    await supabase.from("discount_codes")
-                        .update({ usage_count: (appliedPromo.usage_count || 0) + 1 })
-                        .eq("id", appliedPromo.id);
+                    await db.execute({
+                        sql: "UPDATE discount_codes SET usage_count = usage_count + 1 WHERE id = ?",
+                        args: [appliedPromo.id]
+                    });
                 }
 
                 return res.status(result.statusCode).json(result.data);
@@ -418,13 +403,8 @@ router.post("/", async (req, res) => {
             } catch (error) {
                 console.error(`❌ wePAY Purchase Error at [${currentStep}]:`, error);
 
-                // หากเป็นปัญหาเรื่องยอดเงิน ให้ส่ง 400
                 if (error.message.includes("ยอดเงินไม่เพียงพอ")) {
-                    return res.status(400).json({
-                        success: false,
-                        message: error.message,
-                        step: currentStep
-                    });
+                    return res.status(400).json({ success: false, message: error.message, step: currentStep });
                 }
 
                 return res.status(500).json({
@@ -440,7 +420,7 @@ router.post("/", async (req, res) => {
     // 4. ดึงข้อมูลการตั้งค่าระบบ (แต้ม/ข้อตกลง)
     if (action === "get-settings") {
         try {
-            const { data: settings } = await supabase.from("system_settings").select("*");
+            const { rows: settings } = await db.execute("SELECT * FROM system_settings");
             const config = settings.reduce((acc, curr) => {
                 acc[curr.key] = curr.value;
                 return acc;
@@ -455,49 +435,42 @@ router.post("/", async (req, res) => {
 });
 
 /**
- * wePAY Callback Handler - ตาม wepay.txt ข้อ 6 & 7
- * wePAY ส่งข้อมูลแบบ x-www-form-urlencoded
+ * wePAY Callback Handler
  */
 router.post("/callback", express.urlencoded({ extended: true }), async (req, res) => {
-    const { dest_ref, transaction_id, status, sms } = req.body;
+    const { dest_ref, transaction_id, status } = req.body;
     console.log(`📩 wePAY Callback Received: [${dest_ref}] Status: ${status}`);
 
-    if (!dest_ref) {
-        return res.send("ERROR|MISSING_REF");
-    }
+    if (!dest_ref) return res.send("ERROR|MISSING_REF");
 
     try {
-        // ค้นหาออร์เดอร์ในระบบ
-        const { data: order, error } = await supabase
-            .from("orders")
-            .select("*")
-            .eq("reference", dest_ref)
-            .single();
+        const { rows: oRows } = await db.execute({
+            sql: "SELECT * FROM orders WHERE transaction_id = ? LIMIT 1",
+            args: [dest_ref]
+        });
+        const order = oRows[0];
 
-        if (error || !order) {
+        if (!order) {
             console.error(`❌ Order not found for reference: ${dest_ref}`);
             return res.send(`ERROR|ORDER_NOT_FOUND`);
         }
 
-        // สถานะจาก wePAY: 2 = สำเร็จ, 4 = ล้มเหลว
         if (status == "2") {
-            await supabase.from("orders").update({ status: "success" }).eq("reference", dest_ref);
+            await db.execute({ sql: "UPDATE orders SET status = 'success' WHERE transaction_id = ?", args: [dest_ref] });
             
-            // 🎁 มอบแต้มให้ผู้ใช้ (ถ้ามี)
-            if (order.earned_points > 0) {
-                const { data: userData } = await supabase.from("users").select("points").eq("id", order.user_id).single();
-                const newPoints = (userData?.points || 0) + order.earned_points;
-                await supabase.from("users").update({ points: newPoints }).eq("id", order.user_id);
-                console.log(`🎁 Awarded ${order.earned_points} points to user ${order.user_id}`);
+            // 🎁 มอบแต้มให้ผู้ใช้ (รางวัลการซื้อ)
+            const earnThreshold = 100; // ปกติ 100 บาทได้ 1 แต้ม
+            const earnedPoints = Math.floor(Number(order.amount) / earnThreshold);
+            if (earnedPoints > 0) {
+                await db.execute({ sql: "UPDATE users SET points = points + ? WHERE id = ?", args: [earnedPoints, order.user_id] });
+                console.log(`🎁 Awarded ${earnedPoints} points to user ${order.user_id}`);
             }
         } else if (status == "4") {
-            // ล้มเหลว: เปลี่ยนสถานะและคืนเงินเข้า Wallet
-            await supabase.from("orders").update({ status: "failed" }).eq("reference", dest_ref);
-            await updateBalance(order.user_id, order.package_price, `คืนเงิน wePAY (รายการล้มเหลว): ${dest_ref}`);
-            console.log(`💰 Refunded ${order.package_price} to user ${order.user_id} for failed wePAY order`);
+            await db.execute({ sql: "UPDATE orders SET status = 'failed' WHERE transaction_id = ?", args: [dest_ref] });
+            await updateBalance(order.user_id, Number(order.amount), `คืนเงิน wePAY (รายการล้มเหลว): ${dest_ref}`);
+            console.log(`💰 Refunded ${order.amount} to user ${order.user_id} for failed order`);
         }
 
-        // ตอบกลับตาม wepay.txt ข้อ 7 เพื่อยืนยันการรับข้อมูล
         res.send(`SUCCEED|ORDER_ID=${dest_ref}`);
     } catch (err) {
         console.error("❌ Callback Process Error:", err.message);

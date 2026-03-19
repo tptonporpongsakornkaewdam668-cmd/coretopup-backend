@@ -6,22 +6,24 @@ const { supabase } = require("../db");
 
 // 1. ตรวจสอบยอดเงินปัจจุบัน
 async function getBalance(userId) {
-    const { data, error } = await supabase
-        .from("users")
-        .select("balance")
-        .eq("id", userId)
-        .single();
+    try {
+        const result = await db.execute({
+            sql: "SELECT balance FROM users WHERE id = ? LIMIT 1",
+            args: [userId]
+        });
 
-    if (error) throw error;
-    return parseFloat(data.balance || 0);
+        if (result.rows.length === 0) return 0;
+        return Number(result.rows[0].balance || 0);
+    } catch (error) {
+        console.error("❌ Turso getBalance Error:", error);
+        throw error;
+    }
 }
 
 // 2. ปรับปรุงยอดเงิน (ยอดบวก = เติมเงิน, ยอดลบ = ซื้อของ)
 async function updateBalance(userId, amount, description = "") {
     try {
-        // ใช้ RPC หรือ Transaction เพื่อความปลอดภัยระดับสูงสุด (Concurrency Safety)
-        // แต่สำหรับ Supabase Client พื้นฐาน เราจะใช้การดึงและอัปเดต โดยตรวจสอบสถานะ
-
+        // ดึงยอดเงินปัจจุบันมาเช็คก่อน (สำหรับกรณีที่ยอดติดลบ)
         const currentBalance = await getBalance(userId);
         const newBalance = currentBalance + amount;
 
@@ -29,19 +31,16 @@ async function updateBalance(userId, amount, description = "") {
             throw new Error("ยอดเงินไม่เพียงพอสำหรับทำรายการนี้");
         }
 
-        const { data, error } = await supabase
-            .from("users")
-            .update({ balance: newBalance, updated_at: new Date().toISOString() })
-            .eq("id", userId)
-            .select()
-            .single();
+        // อัปเดตยอดเงินแบบ Atomic (ใช้ SQL ป้องกันการหักเงินซ้อน)
+        await db.execute({
+            sql: "UPDATE users SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            args: [amount, userId]
+        });
 
-        if (error) throw error;
-
-        console.log(`💰 [Wallet] User ${userId}: ${amount > 0 ? '+' : ''}${amount} | New Balance: ${newBalance}`);
-        return data.balance;
+        console.log(`💰 [Wallet-Turso] User ${userId}: ${amount > 0 ? '+' : ''}${amount} | Status: Success`);
+        return newBalance;
     } catch (err) {
-        console.error("❌ Wallet Update Error:", err.message);
+        console.error("❌ Turso Wallet Update Error:", err.message);
         throw err;
     }
 }
