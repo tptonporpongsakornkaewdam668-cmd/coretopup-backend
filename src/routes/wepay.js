@@ -352,8 +352,8 @@ router.post("/", async (req, res) => {
                     });
                 }
 
-                currentStep = "calling_wepay_api";
                 // 🚀 5. ส่งคำสั่งไป wePAY
+                currentStep = "calling_wepay_api";
                 const baseUrl = process.env.WEPAY_CALLBACK_URL || "https://api.coinzonetopup.shop/api/wepay-game/callback";
                 const wepayBody = {
                     type: payload.type || "gtopup",
@@ -370,6 +370,20 @@ router.post("/", async (req, res) => {
 
                 const result = await wepayRequest(wepayBody);
 
+                // 🛑 กรณี wePAY ตอบกลับว่า "ล้มเหลว" ทันที -> คืนเงินให้ผู้ใช้
+                if (result.statusCode !== 200) {
+                    console.error("❌ wePAY Error (Refunding):", result.data);
+                    await updateBalance(req.user.id, finalAmount, `คืนเงินอัตโนมัติ (wePAY Error): ${reference}`);
+                    if (usedPointsCount > 0) {
+                        await db.execute({ sql: "UPDATE users SET points = ? WHERE id = ?", args: [usedPointsCount, req.user.id] });
+                    }
+                    return res.status(result.statusCode).json({
+                        success: false,
+                        message: "ไม่สามารถส่งคำสั่งซื้อไปยัง wePAY ได้ ระบบคืนเงินให้แล้ว",
+                        details: result.data || "wePAY API error"
+                    });
+                }
+
                 currentStep = "saving_order_to_db";
                 // 📝 6. บันทึกประวัติการสั่งซื้อ
                 const orderId = uuidv4();
@@ -384,27 +398,25 @@ router.post("/", async (req, res) => {
                         String(playerId), 
                         server || "-", 
                         finalAmount, 
-                        result.statusCode === 200 ? "processing" : "failed",
+                        "processing",
                         reference,
                         "wepay"
                     ]
                 });
 
-                // สรุปการใช้โค้ดส่วนลดใน DB
-                if (appliedPromo) {
-                    await db.execute({
-                        sql: "UPDATE discount_codes SET usage_count = usage_count + 1 WHERE id = ?",
-                        args: [appliedPromo.id]
-                    });
-                }
-
-                return res.status(result.statusCode).json(result.data);
+                return res.json({ statusCode: 200, success: true, message: "สั่งซื้อสำเร็จ กำลังประมวลผล...", data: result.data });
 
             } catch (error) {
                 console.error(`❌ wePAY Purchase Error at [${currentStep}]:`, error);
 
-                if (error.message.includes("ยอดเงินไม่เพียงพอ")) {
-                    return res.status(400).json({ success: false, message: error.message, step: currentStep });
+                // 💸 ถ้าพังหลังจากหักเงิน -> พยายามคืนเงิน
+                if (currentStep === "calling_wepay_api" || currentStep === "saving_order_to_db") {
+                    try {
+                        await updateBalance(req.user.id, finalAmount, "คืนเงินอัตโนมัติ (System Error)");
+                        console.log("💰 Auto-refunded successful.");
+                    } catch (e) {
+                        console.error("🔥 CRITICAL: FAILED TO REFUND!", e);
+                    }
                 }
 
                 return res.status(500).json({
