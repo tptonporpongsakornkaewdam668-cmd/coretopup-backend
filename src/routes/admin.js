@@ -9,7 +9,6 @@ const multer = require("multer");
 
 const router = express.Router();
 
-// Multer storage
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }
@@ -22,7 +21,6 @@ router.post("/login", adminLimiter, adminLoginRules, async (req, res) => {
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
     if (email !== adminEmail) {
-        await bcrypt.compare("dummy", "$2a$12$dummyhashforsecuritypurposes000000000000000000000000000");
         return res.status(401).json({ success: false, message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" });
     }
 
@@ -37,86 +35,100 @@ router.post("/login", adminLimiter, adminLoginRules, async (req, res) => {
         { expiresIn: "4h" }
     );
 
-    res.json({
-        success: true,
-        message: "เข้าสู่ระบบ Admin สำเร็จ",
-        token,
-        admin: { email: adminEmail, role: "admin" },
-    });
+    res.json({ success: true, message: "เข้าสู่ระบบ Admin สำเร็จ", token, admin: { email: adminEmail, role: "admin" } });
 });
 
-// ─── GET /api/admin/stats ─────────────────────────────────────────────────────
+router.get("/verify", authenticateAdmin, (req, res) => {
+    res.json({ success: true, admin: req.admin });
+});
+
+// ─── Stats ───
 router.get("/stats", authenticateAdmin, async (req, res) => {
     try {
-        const orderResult = await db.execute("SELECT status, amount FROM orders");
-        const userResult = await db.execute("SELECT count(*) as count FROM users");
-        
-        const orders = orderResult.rows;
-        const userCount = userResult.rows[0].count;
+        const orderRes = await db.execute("SELECT status, amount FROM orders");
+        const userRes = await db.execute("SELECT count(*) as count FROM users");
+        const orders = orderRes.rows;
+        const totalUsers = userRes.rows[0].count;
 
         const stats = {
-            totalUsers: userCount || 0,
-            totalOrders: orders?.length || 0,
-            totalRevenue: orders?.filter(o => o.status === 'completed').reduce((sum, o) => sum + (Number(o.amount) || 0), 0) || 0,
+            totalUsers,
+            totalOrders: orders.length,
+            totalRevenue: orders.filter(o => o.status === 'success' || o.status === 'completed').reduce((sum, o) => sum + (Number(o.amount) || 0), 0),
             ordersByStatus: {
-                pending: orders?.filter(o => o.status === 'pending').length || 0,
-                processing: orders?.filter(o => o.status === 'processing').length || 0,
-                completed: orders?.filter(o => o.status === 'completed').length || 0,
-                failed: orders?.filter(o => o.status === 'failed').length || 0,
+                pending: orders.filter(o => o.status === 'pending').length,
+                success: orders.filter(o => o.status === 'success' || o.status === 'completed').length,
+                failed: orders.filter(o => o.status === 'failed').length,
             }
         };
-
         res.json({ success: true, data: stats });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 });
 
-// ─── GET /api/admin/users ─────────────────────────────────────────────────────
+// ─── Users ───
 router.get("/users", authenticateAdmin, async (req, res) => {
     try {
-        const result = await db.execute("SELECT id, username, email, balance, created_at FROM users ORDER BY created_at DESC");
-        res.json({ success: true, data: result.rows, count: result.rows.length });
+        const result = await db.execute("SELECT * FROM users ORDER BY created_at DESC");
+        res.json({ success: true, data: result.rows });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 });
 
-// ─── PATCH /api/admin/users/:id/balance ──────────────────────────────────────
 router.patch("/users/:id/balance", authenticateAdmin, async (req, res) => {
-    const { balance } = req.body;
     try {
-        await db.execute({
-            sql: "UPDATE users SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            args: [balance, req.params.id]
-        });
-        res.json({ success: true, message: "ปรับปรุงยอดเงินสำเร็จ" });
+        await db.execute({ sql: "UPDATE users SET balance = ? WHERE id = ?", args: [req.body.balance, req.params.id] });
+        res.json({ success: true, message: "ปรับยอดเงินสำเร็จ" });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 });
 
-// ─── GET /api/admin/settings ──────────────────────────────────────────────────
+router.patch("/users/:id/points", authenticateAdmin, async (req, res) => {
+    try {
+        await db.execute({ sql: "UPDATE users SET points = ? WHERE id = ?", args: [req.body.points, req.params.id] });
+        res.json({ success: true, message: "ปรับแต้มสำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ─── Orders ───
+router.get("/orders", authenticateAdmin, async (req, res) => {
+    try {
+        const result = await db.execute("SELECT * FROM orders ORDER BY created_at DESC LIMIT 100");
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.patch("/orders/:id/status", authenticateAdmin, async (req, res) => {
+    try {
+        await db.execute({ sql: "UPDATE orders SET status = ? WHERE id = ?", args: [req.body.status, req.params.id] });
+        res.json({ success: true, message: "อัปเดตสถานะสำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ─── Settings ───
 router.get("/settings", authenticateAdmin, async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM system_settings");
-        const config = result.rows.reduce((acc, curr) => {
-            acc[curr.key] = curr.value;
-            return acc;
-        }, {});
+        const config = result.rows.reduce((acc, curr) => { acc[curr.key] = curr.value; return acc; }, {});
         res.json({ success: true, data: config });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 });
 
-// ─── PATCH /api/admin/settings ────────────────────────────────────────────────
 router.patch("/settings", authenticateAdmin, async (req, res) => {
-    const settings = req.body;
     try {
-        for (const [key, value] of Object.entries(settings)) {
+        for (const [key, value] of Object.entries(req.body)) {
             await db.execute({
-                sql: "INSERT INTO system_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP",
+                sql: "INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                 args: [key, value]
             });
         }
@@ -126,51 +138,39 @@ router.patch("/settings", authenticateAdmin, async (req, res) => {
     }
 });
 
-// ─── GET /api/admin/orders ────────────────────────────────────────────────────
-router.get("/orders", authenticateAdmin, async (req, res) => {
-    const { status, limit = 100 } = req.query;
-    try {
-        let sql = "SELECT * FROM orders";
-        let args = [];
-        if (status) {
-            sql += " WHERE status = ?";
-            args.push(status);
-        }
-        sql += " ORDER BY created_at DESC LIMIT ?";
-        args.push(Number(limit));
-
-        const result = await db.execute({ sql, args });
-        res.json({ success: true, data: result.rows, total: result.rows.length });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-// ─── PATCH /api/admin/orders/:id/status ──────────────────────────────────────
-router.patch("/orders/:id/status", authenticateAdmin, async (req, res) => {
-    const { status } = req.body;
-    try {
-        await db.execute({
-            sql: "UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            args: [status, req.params.id]
-        });
-        res.json({ success: true, message: "อัปเดตสถานะสำเร็จ" });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-// ─── Slider Management ────────────────────────────────────────────────────────
+// ─── Sliders ───
 router.get("/sliders", authenticateAdmin, async (req, res) => {
     try {
-        const result = await db.execute("SELECT * FROM sliders ORDER BY id ASC");
+        const result = await db.execute("SELECT * FROM sliders ORDER BY order_index ASC");
         res.json({ success: true, data: result.rows });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 });
 
-// ─── Discount Code Management ────────────────────────────────────────────────
+router.post("/sliders", authenticateAdmin, async (req, res) => {
+    try {
+        const { image_url, link_url, order_index } = req.body;
+        await db.execute({
+            sql: "INSERT INTO sliders (image_url, link_url, order_index) VALUES (?, ?, ?)",
+            args: [image_url, link_url, order_index || 0]
+        });
+        res.json({ success: true, message: "เพิ่มสไลเดอร์สำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.delete("/sliders/:id", authenticateAdmin, async (req, res) => {
+    try {
+        await db.execute({ sql: "DELETE FROM sliders WHERE id = ?", args: [req.params.id] });
+        res.json({ success: true, message: "ลบสไลเดอร์สำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ─── Discounts ───
 router.get("/discounts", authenticateAdmin, async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM discount_codes ORDER BY created_at DESC");
@@ -182,12 +182,21 @@ router.get("/discounts", authenticateAdmin, async (req, res) => {
 
 router.post("/discounts", authenticateAdmin, async (req, res) => {
     try {
-        const { code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active } = req.body;
+        const { code, type, value, is_active } = req.body;
         await db.execute({
-            sql: "INSERT INTO discount_codes (code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-            args: [code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active ? 1 : 0]
+            sql: "INSERT INTO discount_codes (code, type, value, is_active) VALUES (?, ?, ?, ?)",
+            args: [code, type, value, is_active ? 1 : 0]
         });
-        res.json({ success: true, message: "สร้างโค้ดส่วนลดสำเร็จ" });
+        res.json({ success: true, message: "เพิ่มโค้ดสำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.delete("/discounts/:id", authenticateAdmin, async (req, res) => {
+    try {
+        await db.execute({ sql: "DELETE FROM discount_codes WHERE id = ?", args: [req.params.id] });
+        res.json({ success: true, message: "ลบโค้ดสำเร็จ" });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
