@@ -28,10 +28,13 @@ app.use(
 );
 
 const devOrigins = [
-  "http://localhost:5173", 
-  "http://localhost:3000", 
+  "http://localhost:5173",
+  "http://localhost:3000",
   "http://localhost:5000",
-  "https://coinzonetopup.pages.dev" // เพิ่มโดเมนจริงเข้าไปในโค้ดเลยเพื่อความชัวร์
+  "http://localhost:8080",
+  "https://coinzonetopup.pages.dev",
+  "https://www.coinzonetopup.shop",
+  "https://coinzonetopup.shop"
 ];
 const envOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(o => o.trim()).filter(o => o.length > 0);
 const allowedOrigins = Array.from(new Set([...devOrigins, ...envOrigins]));
@@ -57,6 +60,15 @@ app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(hpp());
 app.use("/api", apiLimiter);
 app.disable("x-powered-by");
+
+// Base API welcome route
+app.get("/api", (req, res) => {
+  res.json({
+    success: true,
+    message: "🎮 CoinZoneTopup API is ready!",
+    env: process.env.NODE_ENV
+  });
+});
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -93,14 +105,16 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
   console.error("🔥 Global Error Handler:", err.stack);
-  res.status(500).json({ 
-    success: false, 
-    message: "Internal server error", 
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
     error: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined 
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
 });
 
 app.listen(PORT, () => {
   console.log(`\n🚀 Backend running on port ${PORT}`);
 });
+
+module.exports = app;

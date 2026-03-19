@@ -329,6 +329,7 @@ router.post("/", async (req, res) => {
                 // 🔍 2. ดึงชื่อเกมและการตั้งค่า
                 const { data: gSetting } = await supabase
                     .from("game_settings")
+                    .select("*")
                     .eq("company_id", productId)
                     .maybeSingle();
 
