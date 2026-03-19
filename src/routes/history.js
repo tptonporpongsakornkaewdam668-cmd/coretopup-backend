@@ -1,6 +1,6 @@
 const express = require("express");
 const { authenticate } = require("../middleware/auth");
-const { supabase } = require("../db");
+const { db } = require("../db");
 
 const router = express.Router();
 
@@ -10,35 +10,34 @@ const router = express.Router();
 router.get("/", authenticate, async (req, res) => {
     try {
         // 1. ดึงประวัติการสั่งซื้อ (Orders)
-        const { data: orders, error: orderError } = await supabase
-            .from("orders")
-            .select("*")
-            .eq("user_id", req.user.id)
-            .order("created_at", { ascending: false });
+        const ordersRes = await db.execute({
+            sql: "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
+            args: [req.user.id]
+        });
 
-        // 2. ดึงประวัติการเติมเงิน (Top-ups)
-        const { data: topups, error: topupError } = await supabase
-            .from("topups")
-            .select("*")
-            .eq("user_id", req.user.id)
-            .order("created_at", { ascending: false });
-
-        if (orderError || topupError) {
-            throw new Error("เกิดข้อผิดพลาดในการดึงประวัติทำรายการ");
+        // 2. ดึงประวัติการเติมเงิน (Top-ups) - ตารางนี้อาจจะยังไม่มี ขอกึ่งๆ ไว้ก่อน
+        let topups = [];
+        try {
+            const topupsRes = await db.execute({
+                sql: "SELECT * FROM history WHERE user_id = ? AND type = 'topup' ORDER BY created_at DESC",
+                args: [req.user.id]
+            });
+            topups = topupsRes.rows;
+        } catch (e) {
+            console.warn("⚠️ History table or topup type not ready, returning empty.");
         }
 
         const historyObj = {
-            purchases: orders || [],
+            purchases: ordersRes.rows || [],
             topups: topups || []
         };
-
-        console.log(`📜 [History] Found ${historyObj.purchases.length} purchases and ${historyObj.topups.length} topups for User: ${req.user.id}`);
 
         res.json({
             success: true,
             data: historyObj
         });
     } catch (err) {
+        console.error("❌ History fetch error:", err.message);
         res.status(500).json({ success: false, message: err.message });
     }
 });

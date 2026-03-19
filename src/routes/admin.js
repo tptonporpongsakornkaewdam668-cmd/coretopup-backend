@@ -4,15 +4,15 @@ const jwt = require("jsonwebtoken");
 const { authenticateAdmin } = require("../middleware/adminAuth");
 const { adminLoginRules } = require("../middleware/validate");
 const { adminLimiter } = require("../middleware/rateLimiter");
-const { supabase } = require("../db");
+const { db } = require("../db");
 const multer = require("multer");
 
 const router = express.Router();
 
-// Multer storage for slider images
+// Multer storage
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+    limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 // ─── POST /api/admin/login ────────────────────────────────────────────────────
@@ -48,13 +48,16 @@ router.post("/login", adminLimiter, adminLoginRules, async (req, res) => {
 // ─── GET /api/admin/stats ─────────────────────────────────────────────────────
 router.get("/stats", authenticateAdmin, async (req, res) => {
     try {
-        const { data: orders } = await supabase.from("orders").select("status, package_price");
-        const { count: userCount } = await supabase.from("users").select("*", { count: 'exact', head: true });
+        const orderResult = await db.execute("SELECT status, amount FROM orders");
+        const userResult = await db.execute("SELECT count(*) as count FROM users");
+        
+        const orders = orderResult.rows;
+        const userCount = userResult.rows[0].count;
 
         const stats = {
             totalUsers: userCount || 0,
             totalOrders: orders?.length || 0,
-            totalRevenue: orders?.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.package_price, 0) || 0,
+            totalRevenue: orders?.filter(o => o.status === 'completed').reduce((sum, o) => sum + (Number(o.amount) || 0), 0) || 0,
             ordersByStatus: {
                 pending: orders?.filter(o => o.status === 'pending').length || 0,
                 processing: orders?.filter(o => o.status === 'processing').length || 0,
@@ -71,72 +74,52 @@ router.get("/stats", authenticateAdmin, async (req, res) => {
 
 // ─── GET /api/admin/users ─────────────────────────────────────────────────────
 router.get("/users", authenticateAdmin, async (req, res) => {
-    const { data: users, error } = await supabase
-        .from("users")
-        .select("id, username, email, balance, created_at")
-        .order("created_at", { ascending: false });
-
-    if (error) return res.status(500).json({ success: false, message: error.message });
-    res.json({ success: true, data: users, count: users.length });
+    try {
+        const result = await db.execute("SELECT id, username, email, balance, created_at FROM users ORDER BY created_at DESC");
+        res.json({ success: true, data: result.rows, count: result.rows.length });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // ─── PATCH /api/admin/users/:id/balance ──────────────────────────────────────
 router.patch("/users/:id/balance", authenticateAdmin, async (req, res) => {
     const { balance } = req.body;
-    const { data: user, error } = await supabase
-        .from("users")
-        .update({ balance, updated_at: new Date().toISOString() })
-        .eq("id", req.params.id)
-        .select()
-        .single();
-
-    if (error) return res.status(500).json({ success: false, message: error.message });
-    res.json({ success: true, message: "ปรับปรุงยอดเงินสำเร็จ", data: user });
-});
-
-// ─── PATCH /api/admin/users/:id/points ────────────────────────────────────────
-router.patch("/users/:id/points", authenticateAdmin, async (req, res) => {
-    const { points } = req.body;
-    const { data: user, error } = await supabase
-        .from("users")
-        .update({ points, updated_at: new Date().toISOString() })
-        .eq("id", req.params.id)
-        .select()
-        .single();
-
-    if (error) return res.status(500).json({ success: false, message: error.message });
-    res.json({ success: true, message: "ปรับปรุงแต้มสำเร็จ", data: user });
+    try {
+        await db.execute({
+            sql: "UPDATE users SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            args: [balance, req.params.id]
+        });
+        res.json({ success: true, message: "ปรับปรุงยอดเงินสำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // ─── GET /api/admin/settings ──────────────────────────────────────────────────
 router.get("/settings", authenticateAdmin, async (req, res) => {
-    const { data: settings, error } = await supabase
-        .from("system_settings")
-        .select("*");
-
-    if (error) return res.status(500).json({ success: false, message: error.message });
-    
-    // Convert array to object key-value pairs
-    const config = settings.reduce((acc, curr) => {
-        acc[curr.key] = curr.value;
-        return acc;
-    }, {});
-
-    res.json({ success: true, data: config });
+    try {
+        const result = await db.execute("SELECT * FROM system_settings");
+        const config = result.rows.reduce((acc, curr) => {
+            acc[curr.key] = curr.value;
+            return acc;
+        }, {});
+        res.json({ success: true, data: config });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // ─── PATCH /api/admin/settings ────────────────────────────────────────────────
 router.patch("/settings", authenticateAdmin, async (req, res) => {
-    const settings = req.body; // Expecting { key1: value1, key2: value2 }
-    
+    const settings = req.body;
     try {
-        const updates = Object.entries(settings).map(([key, value]) => {
-            return supabase
-                .from("system_settings")
-                .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-        });
-
-        await Promise.all(updates);
+        for (const [key, value] of Object.entries(settings)) {
+            await db.execute({
+                sql: "INSERT INTO system_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP",
+                args: [key, value]
+            });
+        }
         res.json({ success: true, message: "บันทึกการตั้งค่าสำเร็จ" });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -146,187 +129,42 @@ router.patch("/settings", authenticateAdmin, async (req, res) => {
 // ─── GET /api/admin/orders ────────────────────────────────────────────────────
 router.get("/orders", authenticateAdmin, async (req, res) => {
     const { status, limit = 100 } = req.query;
+    try {
+        let sql = "SELECT * FROM orders";
+        let args = [];
+        if (status) {
+            sql += " WHERE status = ?";
+            args.push(status);
+        }
+        sql += " ORDER BY created_at DESC LIMIT ?";
+        args.push(Number(limit));
 
-    let query = supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(limit);
-    if (status) query = query.eq("status", status);
-
-    const { data: orders, error } = await query;
-    if (error) return res.status(500).json({ success: false, message: error.message });
-
-    res.json({ success: true, data: orders, total: orders.length });
+        const result = await db.execute({ sql, args });
+        res.json({ success: true, data: result.rows, total: result.rows.length });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // ─── PATCH /api/admin/orders/:id/status ──────────────────────────────────────
 router.patch("/orders/:id/status", authenticateAdmin, async (req, res) => {
     const { status } = req.body;
-    const { data: order, error } = await supabase
-        .from("orders")
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq("id", req.params.id)
-        .select()
-        .single();
-
-    if (error) return res.status(500).json({ success: false, message: error.message });
-
-    res.json({ success: true, message: "อัปเดตสำเร็จ", data: order });
-});
-
-router.get("/verify", authenticateAdmin, (req, res) => {
-    res.json({ success: true, admin: req.admin });
-});
-
-// 5. อัปเดตราคาต้นทุน ขาย และส่วนลดสินค้า wePAY
-router.patch("/products/override", authenticateAdmin, async (req, res) => {
-    const { company_id, original_price, cost_price, selling_price, discount_price, discount_start, discount_end } = req.body;
-
-    if (!company_id || original_price === undefined) {
-        return res.status(400).json({ message: "ข้อมูลไม่ครบถ้วน" });
-    }
-
     try {
-        const { data, error } = await supabase
-            .from("product_overrides")
-            .upsert({
-                company_id,
-                original_price,
-                cost_price,
-                selling_price,
-                discount_price,
-                discount_start: discount_start || null,
-                discount_end: discount_end || null,
-                updated_at: new Date()
-            }, { onConflict: 'company_id,original_price' })
-            .select()
-            .single();
-
-        if (error) throw error;
-        res.json({ message: "อัปเดตราคาและส่วนลดสำเร็จ", data });
-    } catch (error) {
-        console.error("❌ Override Update Error:", error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-
-// 6. อัปเดตข้อมูลเกม (ชื่อ/รูปภาพ)
-router.patch("/games/settings", authenticateAdmin, async (req, res) => {
-    const { company_id, custom_name, custom_image_url } = req.body;
-
-    if (!company_id) return res.status(400).json({ message: "ระบุ company_id" });
-
-    try {
-        const { data, error } = await supabase
-            .from("game_settings")
-            .upsert({
-                company_id,
-                custom_name,
-                custom_image_url,
-                updated_at: new Date()
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
-        res.json({ message: "บันทึกการตั้งค่าตัวเลือกเกมสำเร็จ", data });
-    } catch (error) {
-        console.error("❌ Game Settings Error:", error);
-        res.status(500).json({ success: false, message: error.message });
+        await db.execute({
+            sql: "UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            args: [status, req.params.id]
+        });
+        res.json({ success: true, message: "อัปเดตสถานะสำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 
 // ─── Slider Management ────────────────────────────────────────────────────────
-
-// GET /api/admin/sliders
 router.get("/sliders", authenticateAdmin, async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from("sliders")
-            .select("*")
-            .order("order_index", { ascending: true });
-
-        if (error) throw error;
-        res.json({ success: true, data });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-// POST /api/admin/sliders - Upload and Add Slider
-router.post("/sliders", authenticateAdmin, upload.single("image"), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: "กรุณาอัปโหลดรูปภาพ" });
-        }
-
-        const fileName = `${Date.now()}-${req.file.originalname}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from("sliders")
-            .upload(fileName, req.file.buffer, {
-                contentType: req.file.mimetype,
-                cacheControl: "3600",
-                upsert: false
-            });
-
-        if (uploadError) {
-            if (uploadError.message === "Bucket not found") {
-                return res.status(404).json({ 
-                    success: false, 
-                    message: "🚨 Storage Bucket 'sliders' ยังไม่ได้สร้างใน Supabase Storage! กรุณาสร้าง Bucket ก่อน" 
-                });
-            }
-            throw uploadError;
-        }
-
-        const { data: { publicUrl } } = supabase.storage
-            .from("sliders")
-            .getPublicUrl(fileName);
-
-        const { data, error } = await supabase
-            .from("sliders")
-            .insert([{
-                image_url: publicUrl,
-                link_url: req.body.link_url || null,
-                order_index: req.body.order_index || 0,
-                created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
-
-        if (error) throw error;
-        res.json({ success: true, message: "เพิ่มรูปภาพสไลเดอร์สำเร็จ", data });
-    } catch (err) {
-        console.error("❌ Slider Upload Error:", err);
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-// DELETE /api/admin/sliders/:id
-router.get("/sliders/delete/:id", authenticateAdmin, async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        // 1. Get the image URL to delete from storage
-        const { data: slider, error: getError } = await supabase
-            .from("sliders")
-            .select("image_url")
-            .eq("id", id)
-            .single();
-
-        if (getError) throw getError;
-
-        if (slider && slider.image_url) {
-            const fileName = slider.image_url.split("/").pop();
-            await supabase.storage.from("sliders").remove([fileName]);
-        }
-
-        // 2. Delete from DB
-        const { error: deleteError } = await supabase
-            .from("sliders")
-            .delete()
-            .eq("id", id);
-
-        if (deleteError) throw deleteError;
-
-        res.json({ success: true, message: "ลบรูปภาพสไลเดอร์สำเร็จ" });
+        const result = await db.execute("SELECT * FROM sliders ORDER BY id ASC");
+        res.json({ success: true, data: result.rows });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -335,9 +173,8 @@ router.get("/sliders/delete/:id", authenticateAdmin, async (req, res) => {
 // ─── Discount Code Management ────────────────────────────────────────────────
 router.get("/discounts", authenticateAdmin, async (req, res) => {
     try {
-        const { data, error } = await supabase.from("discount_codes").select("*").order("created_at", { ascending: false });
-        if (error) throw error;
-        res.json({ success: true, data });
+        const result = await db.execute("SELECT * FROM discount_codes ORDER BY created_at DESC");
+        res.json({ success: true, data: result.rows });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -345,34 +182,12 @@ router.get("/discounts", authenticateAdmin, async (req, res) => {
 
 router.post("/discounts", authenticateAdmin, async (req, res) => {
     try {
-        const { code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active, title, description, image_url } = req.body;
-        const { data, error } = await supabase.from("discount_codes").insert([{
-            code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active, title, description, image_url
-        }]).select().single();
-        if (error) throw error;
-        res.json({ success: true, message: "สร้างโค้ดส่วนลดสำเร็จ", data });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-router.patch("/discounts/:id", authenticateAdmin, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { data, error } = await supabase.from("discount_codes").update({ ...req.body, updated_at: new Date() }).eq("id", id).select().single();
-        if (error) throw error;
-        res.json({ success: true, message: "อัปเดตโค้ดส่วนลดสำเร็จ", data });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-router.delete("/discounts/:id", authenticateAdmin, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { error } = await supabase.from("discount_codes").delete().eq("id", id);
-        if (error) throw error;
-        res.json({ success: true, message: "ลบโค้ดส่วนลดสำเร็จ" });
+        const { code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active } = req.body;
+        await db.execute({
+            sql: "INSERT INTO discount_codes (code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+            args: [code, type, value, min_order_amount, max_discount, usage_limit, end_date, is_active ? 1 : 0]
+        });
+        res.json({ success: true, message: "สร้างโค้ดส่วนลดสำเร็จ" });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

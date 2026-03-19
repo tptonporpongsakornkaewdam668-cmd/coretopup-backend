@@ -1,5 +1,5 @@
 const express = require("express");
-const { supabase } = require("../db");
+const { db } = require("../db");
 const { getCached, invalidate } = require("../services/cache");
 
 const router = express.Router();
@@ -9,12 +9,8 @@ const CACHE_KEY = "sliders:all";
 router.get("/", async (req, res) => {
     try {
         const data = await getCached(CACHE_KEY, async () => {
-            const { data, error } = await supabase
-                .from("sliders")
-                .select("*")
-                .order("order_index", { ascending: true });
-            if (error) throw error;
-            return data;
+            const result = await db.execute("SELECT * FROM sliders WHERE is_active = 1 ORDER BY id ASC");
+            return result.rows;
         }, 10 * 60 * 1000); // 10 minutes
 
         res.json({ success: true, data });

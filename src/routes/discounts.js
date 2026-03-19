@@ -1,25 +1,17 @@
 const express = require("express");
-const { supabase } = require("../db");
+const { db } = require("../db");
 
 const router = express.Router();
 
 // GET /api/discounts - List all active discounts publicly
 router.get("/", async (req, res) => {
     try {
-        const now = new Date().toISOString();
+        const result = await db.execute({
+            sql: "SELECT * FROM discount_codes WHERE is_active = 1 AND (end_date IS NULL OR end_date >= datetime('now')) ORDER BY created_at DESC",
+            args: []
+        });
         
-        // Fetch discounts that are active and haven't expired
-        const { data, error } = await supabase
-            .from("discount_codes")
-            .select("*")
-            .eq("is_active", true)
-            .or(`end_date.is.null,end_date.gte.${now}`)
-            .order("created_at", { ascending: false });
-
-        if (error) throw error;
-
-        // Optionally filter by usage_limit if you want to do it in the backend
-        const activeDiscounts = data.filter(d => {
+        const activeDiscounts = result.rows.filter(d => {
             if (d.usage_limit && d.usage_count >= d.usage_limit) return false;
             return true;
         });

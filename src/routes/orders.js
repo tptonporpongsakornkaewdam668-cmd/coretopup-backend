@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require("uuid");
 const { authenticate } = require("../middleware/auth");
 const { orderLimiter } = require("../middleware/rateLimiter");
 const { orderRules } = require("../middleware/validate");
-const { supabase } = require("../db");
+const { db } = require("../db");
 
 const router = express.Router();
 const { updateBalance, getBalance } = require("../services/wallet");
@@ -21,7 +21,6 @@ router.post("/", authenticate, orderLimiter, orderRules, async (req, res) => {
     } = req.body;
 
     try {
-        // 🛡️ 1. ตรวจสอบยอดเงินคงเหลือจาก Wallet Service
         const currentBalance = await getBalance(req.user.id);
         if (currentBalance < packagePrice) {
             return res.status(400).json({
@@ -30,42 +29,31 @@ router.post("/", authenticate, orderLimiter, orderRules, async (req, res) => {
             });
         }
 
-        // 💰 2. หักเงินผู้ใช้ (ยอดติดลบ)
         await updateBalance(req.user.id, -packagePrice, `ซื้อสินค้า ${gameName}: ${packageName}`);
 
-        // 3. บันทึกคำสั่งซื้อลงฐานข้อมูล
-        const newOrder = {
-            id: uuidv4(),
-            user_id: req.user.id,
-            user_email: req.user.email,
-            game_slug: gameSlug,
-            game_name: gameName,
-            package_id: packageId,
-            package_name: packageName,
-            package_price: Number(packagePrice),
-            player_id: playerId,
-            server: server || "-",
-            payment_method: "wallet",
-            status: "pending",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        };
+        const orderId = uuidv4();
+        await db.execute({
+            sql: `INSERT INTO orders (id, user_id, user_email, product_id, product_name, amount, player_id, server, status, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            args: [
+                orderId,
+                req.user.id,
+                req.user.email || "user@example.com",
+                String(packageId),
+                `${gameName} - ${packageName}`,
+                Number(packagePrice),
+                String(playerId),
+                server || "-",
+                "pending"
+            ]
+        });
 
-        const { error: insertError } = await supabase.from("orders").insert([newOrder]);
-
-        if (insertError) {
-            console.error("❌ Supabase Order Insert Error:", insertError);
-            // กรณีบันทึก Order ไม่สำเร็จ ต้องพิจารณาเลือกว่าจะคืนเงิน (Refund) ให้ User หรือไม่
-            // แต่ในระบบทั่วไป เราควร Logging ไว้เพื่อตรวจสอบ manual
-            return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการบันทึกคำสั่งซื้อ" });
-        }
-
-        console.log(`📦 Order Created [${newOrder.id}]: ${newOrder.game_name} for ${newOrder.user_email}`);
+        console.log(`📦 Order Created [${orderId}]: ${gameName} for ${req.user.email}`);
 
         res.status(201).json({
             success: true,
             message: "สั่งซื้อสำเร็จ ระบบกำลังดำเนินการ",
-            data: newOrder,
+            data: { id: orderId, status: "pending" },
         });
     } catch (err) {
         console.error("❌ Order Processing Error:", err.message);
@@ -73,44 +61,42 @@ router.post("/", authenticate, orderLimiter, orderRules, async (req, res) => {
     }
 });
 
-
 // ─── GET /api/orders/my ───────────────────────────────────────────────────────
 router.get("/my", authenticate, async (req, res) => {
-    const { data: myOrders, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("user_id", req.user.id)
-        .order("created_at", { ascending: false });
+    try {
+        const result = await db.execute({
+            sql: "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
+            args: [req.user.id]
+        });
+        const myOrders = result.rows;
 
-    if (error) {
-        console.error("Supabase Get Orders Error:", error);
+        res.json({ success: true, data: myOrders, count: myOrders.length });
+    } catch (error) {
+        console.error("Turso Get Orders Error:", error);
         return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการดึงข้อมูล" });
     }
-
-    res.json({ success: true, data: myOrders, count: myOrders.length });
 });
 
 // ─── GET /api/orders/:id ──────────────────────────────────────────────────────
 router.get("/:id", authenticate, async (req, res) => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(req.params.id)) {
-        return res.status(400).json({ success: false, message: "Order ID ไม่ถูกต้อง" });
-    }
+    try {
+        const result = await db.execute({
+            sql: "SELECT * FROM orders WHERE id = ? LIMIT 1",
+            args: [req.params.id]
+        });
+        const order = result.rows[0];
 
-    const { data: order, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", req.params.id)
-        .single();
+        if (!order) {
+            return res.status(404).json({ success: false, message: "ไม่พบ Order นี้" });
+        }
+        if (order.user_id !== req.user.id) {
+            return res.status(403).json({ success: false, message: "ไม่มีสิทธิ์ดู Order นี้" });
+        }
 
-    if (error || !order) {
-        return res.status(404).json({ success: false, message: "ไม่พบ Order นี้" });
+        res.json({ success: true, data: order });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
     }
-    if (order.user_id !== req.user.id) {
-        return res.status(403).json({ success: false, message: "ไม่มีสิทธิ์ดู Order นี้" });
-    }
-
-    res.json({ success: true, data: order });
 });
 
 module.exports = router;

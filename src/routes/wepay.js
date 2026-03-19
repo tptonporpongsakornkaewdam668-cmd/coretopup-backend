@@ -2,7 +2,7 @@ const express = require("express");
 const { wepayRequest, getWepayProductList } = require("../services/wepay");
 const { authenticate } = require("../middleware/auth");
 const { updateBalance, getBalance } = require("../services/wallet");
-const { supabase } = require("../db");
+const { db } = require("../db");
 const { v4: uuidv4 } = require("uuid");
 const { getCached, invalidate } = require("../services/cache");
 

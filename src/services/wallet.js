@@ -1,4 +1,4 @@
-const { supabase } = require("../db");
+const { db } = require("../db");
 
 /**
  * Wallet Service - จัดการยอดเงินคงเหลือของผู้ใช้อย่างปลอดภัย

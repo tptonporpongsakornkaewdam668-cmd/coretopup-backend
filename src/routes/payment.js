@@ -2,7 +2,7 @@ const express = require("express");
 const axios = require("axios");
 const { authenticate } = require("../middleware/auth");
 const { updateBalance } = require("../services/wallet");
-const { supabase } = require("../db");
+const { db } = require("../db");
 
 const multer = require("multer");
 const FormData = require("form-data");
@@ -136,41 +136,39 @@ router.post("/verify-slip-image", authenticate, upload.single("file"), async (re
         // ส่งไปตรวจที่ Slip2Go แล้ว หากรหัสผ่านคือ 200000/200200 แปลว่า Slip2Go ยืนยันว่าเลขบัญชีผู้รับถูกต้อง
         // การเช็คเองที่นี่จะพังเพราะธนาคารมักจะเซนเซอร์ (Mask) เลขบัญชีใน JSON ข้อมูลสลิป
 
-        console.log("🔍 [Payment] Checking for duplicate transRef in DB...");
-        // ตรวจสอบ Duplicate (กันสลิปซ้ำ)
-        const { data: existingTopUp, error: dupError } = await supabase
-            .from("topups")
-            .select("id")
-            .eq("trans_ref", transRef)
-            .maybeSingle();
+        const dupCheck = await db.execute({
+            sql: "SELECT id FROM topups WHERE trans_ref = ? LIMIT 1",
+            args: [transRef]
+        });
 
-        if (dupError) {
-            console.error("❌ [Payment] DB Dup Check Error:", dupError);
-            throw dupError;
-        }
-
-        if (existingTopUp) {
+        if (dupCheck.rows.length > 0) {
             console.log("⚠️ [Payment] Duplicate slip detected");
             return res.status(400).json({ success: false, message: "สลิปนี้เคยถูกใช้งานไปแล้ว" });
         }
 
-        console.log("📝 [Payment] Inserting topup record into DB...");
-        // บันทึกรายการลงตาราง topups
-        const { error: insertError } = await supabase
-            .from("topups")
-            .insert([{
-                user_id: req.user.id,
-                amount: amount,
-                trans_ref: transRef,
-                sender_name: slipData.sender?.account?.name || "Unknown",
-                sender_bank: slipData.sender?.bank?.name || "Unknown",
-                status: "success"
-            }]);
+        // บันทึกรายการลงตาราง topups (สร้างตารางถ้าไม่มี)
+        await db.execute(`CREATE TABLE IF NOT EXISTS topups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            user_id TEXT, 
+            amount DECIMAL, 
+            trans_ref TEXT UNIQUE, 
+            sender_name TEXT, 
+            sender_bank TEXT, 
+            status TEXT, 
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
 
-        if (insertError) {
-            console.error("❌ [Payment] DB Insert Error:", insertError);
-            throw insertError;
-        }
+        await db.execute({
+            sql: "INSERT INTO topups (user_id, amount, trans_ref, sender_name, sender_bank, status) VALUES (?, ?, ?, ?, ?, ?)",
+            args: [
+                req.user.id,
+                amount,
+                transRef,
+                slipData.sender?.account?.name || "Unknown",
+                slipData.sender?.bank?.name || "Unknown",
+                "success"
+            ]
+        });
 
         console.log("📊 [Payment] Updating user balance...");
         // เติมเงินเข้า Wallet ผู้ใช้จริง
@@ -267,37 +265,27 @@ router.post("/verify-slip", authenticate, async (req, res) => {
         // เชื่อใจผลลัพธ์จาก Slip2Go (checkCondition ตรวจสอบให้แล้ว)
 
         // 2. ตรวจสอบในฐานข้อมูลว่ามีการเติมเงินรายการนี้ไปหรือยัง (ป้องกัน Double Top-up)
-        const { data: existingTopUp, error: checkError } = await supabase
-            .from("topups")
-            .select("id")
-            .eq("trans_ref", transRef)
-            .maybeSingle();
+        const dupCheck = await db.execute({
+            sql: "SELECT id FROM topups WHERE trans_ref = ? LIMIT 1",
+            args: [transRef]
+        });
 
-        if (checkError) {
-            console.error("❌ [Payment] DB Check Error:", checkError);
-            throw checkError;
-        }
-
-        if (existingTopUp) {
+        if (dupCheck.rows.length > 0) {
             return res.status(409).json({ success: false, message: "รายการโอนเงินนี้ถูกใช้ไปแล้ว" });
         }
 
         // 3. บันทึกประวัติการเติมเงิน
-        const { error: insertError } = await supabase
-            .from("topups")
-            .insert([{
-                user_id: req.user.id,
-                amount: amount,
-                trans_ref: transRef,
-                sender_name: slipData.sender?.account?.name || slipData.sender?.name || "Unknown",
-                sender_bank: slipData.sender?.bank?.name || slipData.sender?.bank || "Unknown",
-                status: "success"
-            }]);
-
-        if (insertError) {
-            console.error("❌ [Payment] DB Insert Error:", insertError);
-            throw insertError;
-        }
+        await db.execute({
+            sql: "INSERT INTO topups (user_id, amount, trans_ref, sender_name, sender_bank, status) VALUES (?, ?, ?, ?, ?, ?)",
+            args: [
+                req.user.id,
+                amount,
+                transRef,
+                slipData.sender?.account?.name || slipData.sender?.name || "Unknown",
+                slipData.sender?.bank?.name || slipData.sender?.bank || "Unknown",
+                "success"
+            ]
+        });
 
         // 4. เพิ่มเงินเข้า Wallet ผู้ใช้จริง
         const newBalance = await updateBalance(req.user.id, amount, `Top up via QR: ${transRef}`);
