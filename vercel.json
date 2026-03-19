@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "alias": "api.coinzonetopup.shop",
   "builds": [
     {
       "src": "src/index.js",

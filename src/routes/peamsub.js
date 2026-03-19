@@ -73,9 +73,16 @@ router.post("/purchase", authenticate, async (req, res) => {
             await updateBalance(req.user.id, -packagePrice, `ซื้อสินค้า Peamsub ${type}: ${packageName || id}`);
 
             const orderId = uuidv4();
+            // Extract product delivery data (card codes, credentials, etc.)
+            const productData = result.data?.data?.product_data 
+                || result.data?.data?.card 
+                || result.data?.data?.code
+                || result.data?.data?.credentials
+                || result.data?.data || null;
+
             await db.execute({
-                sql: `INSERT INTO orders (id, user_id, user_email, product_id, product_name, amount, player_id, server, status, transaction_id, provider, created_at)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                sql: `INSERT INTO orders (id, user_id, user_email, product_id, product_name, amount, player_id, server, status, transaction_id, provider, product_data, created_at)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
                 args: [
                     orderId,
                     req.user.id,
@@ -87,7 +94,8 @@ router.post("/purchase", authenticate, async (req, res) => {
                     payload?.server || "-",
                     "success",
                     reference,
-                    "peamsub"
+                    "peamsub",
+                    productData ? JSON.stringify(productData) : null
                 ]
             });
 

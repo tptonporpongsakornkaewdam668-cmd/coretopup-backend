@@ -65,6 +65,8 @@ router.post("/", async (req, res) => {
                                 ? denom.description.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()
                                 : '';
 
+                            let finalImg = override?.custom_image_url || displayImg || null;
+
                             formatted.push({
                                 id: game.company_id,
                                 original_id: game.company_id,
@@ -73,7 +75,7 @@ router.post("/", async (req, res) => {
                                 base_price: basePrice,
                                 cost: override?.cost_price || null,
                                 category: displayName,
-                                img: displayImg || null,
+                                img: finalImg,
                                 des: cleanDesc,
                                 type: 'gtopup',
                                 is_discount: isDiscounted,
@@ -139,6 +141,8 @@ router.post("/", async (req, res) => {
                                 ? denom.description.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()
                                 : `${basePrice} บาท`;
 
+                            let finalImg = override?.custom_image_url || displayImg || null;
+
                             formatted.push({
                                 id: card.company_id,
                                 original_id: card.company_id,
@@ -147,9 +151,11 @@ router.post("/", async (req, res) => {
                                 base_price: basePrice,
                                 category: displayName,
                                 description: cleanDesc,
-                                img: displayImg || null,
+                                img: finalImg,
                                 type: 'cashcard',
                                 is_discount: isDiscounted,
+                                override_data: override || null,
+                                setting_data: setting || null
                             });
                         });
                     }
@@ -309,7 +315,7 @@ router.post("/", async (req, res) => {
                         }
                     }
                 }
-                
+
                 // 🔍 1.6 ตรวจสอบการใช้แต้ม (Redeem Points)
                 let pointDiscount = 0;
                 let usedPointsCount = 0;
@@ -321,7 +327,7 @@ router.post("/", async (req, res) => {
                 }
 
                 const finalAmount = Math.max(0, expectedPrice - discountAmount - pointDiscount);
-                
+
                 // 🔍 2. ดึงชื่อเกมและการตั้งค่า
                 const { rows: gsRows } = await db.execute({
                     sql: "SELECT * FROM game_settings WHERE company_id = ? LIMIT 1",
@@ -344,7 +350,7 @@ router.post("/", async (req, res) => {
                 currentStep = "deducting_balance_and_points";
                 // 💰 4. หักเงินและยอดแต้ม
                 await updateBalance(req.user.id, -finalAmount, `จ่าย: ${gameDisplayName} [${productId}]${usePoints ? ' (ใช้แต้ม)' : ''}`);
-                
+
                 if (usedPointsCount > 0) {
                     await db.execute({
                         sql: "UPDATE users SET points = 0 WHERE id = ?",
@@ -355,26 +361,40 @@ router.post("/", async (req, res) => {
                 // 🚀 5. ส่งคำสั่งไป wePAY
                 currentStep = "calling_wepay_api";
                 const baseUrl = process.env.WEPAY_CALLBACK_URL || "https://api.coinzonetopup.shop/api/wepay-game/callback";
-                
+
                 // 🎰 บังคับเจน Reference ใหม่ให้สั้น (ไม่เกิน 20 หลัก) ตามกฎ wePAY เสมอ
                 const safeReference = `G${Date.now().toString().slice(-10)}${Math.random().toString(36).substring(2, 7)}`.toUpperCase();
                 console.log(`📡 [WePay API] Using Safe Reference: ${safeReference}`);
+
+                // 🎰wePAY สำหรับบางเกม (เช่น Heartopia) ต้องการ AID [วรรค] UID ในช่อง ref1 ช่องเดียว
+                let finalProcessedRef1 = String(playerId).trim();
+
+                // 🔄 ถ้ามีเว้นวรรค (UID วรรค AID) ให้ทำการ "สลับตำแหน่ง" เป็น (AID วรรค UID) ตามที่คุณสั่งครับ!
+                if (finalProcessedRef1.includes(" ")) {
+                    const parts = finalProcessedRef1.split(" ");
+                    // parts[0] คือ UID, parts[1] คือ AID -> เราสลับเป็น [1] [0]
+                    if (parts.length >= 2) {
+                        finalProcessedRef1 = `${parts[1].trim()} ${parts[0].trim()}`;
+                        console.log(`🔄 [Backend Swap] Heartopia detected: Swapping ids to: ${finalProcessedRef1}`);
+                    }
+                }
 
                 const wepayBody = {
                     type: payload.type || "gtopup",
                     pay_to_company: productId,
                     pay_to_amount: String(basePrice),
-                    pay_to_ref1: String(playerId),
+                    pay_to_ref1: finalProcessedRef1,
                     dest_ref: safeReference,
                     resp_url: baseUrl.includes("callback") ? baseUrl : `${baseUrl}/callback`
                 };
 
-                if (server && server !== "-") {
+                // ถ้ามี server แยกต่างหาก (กรณีเกมอื่นที่ไม่ใช่แนว UID วรรค AID)
+                if (server && server !== "-" && !String(playerId).includes(String(server))) {
                     wepayBody.pay_to_ref2 = String(server);
                 }
 
                 const result = await wepayRequest(wepayBody);
-                
+
                 console.log(`📥 [WePay] API Status: ${result.statusCode}`);
                 console.log(`📥 [WePay] API Result:`, result.data);
 
@@ -403,13 +423,13 @@ router.post("/", async (req, res) => {
                     sql: `INSERT INTO orders (id, user_id, product_id, product_name, player_id, server, amount, status, transaction_id, provider, created_at)
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
                     args: [
-                        orderId, 
-                        req.user.id, 
-                        String(productId), 
-                        gameDisplayName, 
-                        String(playerId), 
-                        server || "-", 
-                        finalAmount, 
+                        orderId,
+                        req.user.id,
+                        String(productId),
+                        gameDisplayName,
+                        String(playerId),
+                        server || "-",
+                        finalAmount,
                         "processing",
                         safeReference, // เลข Reference 16 หลักที่เราส่งให้ wePAY (เก็บใน transaction_id)
                         "wepay"
@@ -481,7 +501,7 @@ router.post("/callback", express.urlencoded({ extended: true }), async (req, res
 
         if (status == "2") {
             await db.execute({ sql: "UPDATE orders SET status = 'success' WHERE transaction_id = ?", args: [dest_ref] });
-            
+
             // 🎁 มอบแต้มให้ผู้ใช้ (รางวัลการซื้อ)
             const earnThreshold = 100; // ปกติ 100 บาทได้ 1 แต้ม
             const earnedPoints = Math.floor(Number(order.amount) / earnThreshold);

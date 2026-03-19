@@ -5,6 +5,7 @@ const { authenticateAdmin } = require("../middleware/adminAuth");
 const { adminLoginRules } = require("../middleware/validate");
 const { adminLimiter } = require("../middleware/rateLimiter");
 const { db } = require("../db");
+const { invalidate } = require("../services/cache");
 const multer = require("multer");
 
 const router = express.Router();
@@ -189,6 +190,67 @@ router.post("/discounts", authenticateAdmin, async (req, res) => {
         });
         res.json({ success: true, message: "เพิ่มโค้ดสำเร็จ" });
     } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ─── Products & Settings ───
+router.get("/game-settings", authenticateAdmin, async (req, res) => {
+    try {
+        const result = await db.execute("SELECT * FROM game_settings");
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.patch("/products/override", authenticateAdmin, async (req, res) => {
+    try {
+        const { 
+            company_id, 
+            original_price, 
+            selling_price, 
+            cost_price, 
+            discount_price, 
+            discount_start, 
+            discount_end,
+            custom_image_url
+        } = req.body;
+
+        if (!company_id || original_price === undefined) {
+            return res.status(400).json({ success: false, message: "Missing company_id or original_price" });
+        }
+
+        // 1. Update/Insert Product Override
+        await db.execute({
+            sql: `INSERT INTO product_overrides 
+                  (company_id, original_price, selling_price, cost_price, discount_price, discount_start, discount_end, custom_image_url) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                  ON CONFLICT(company_id, original_price) DO UPDATE SET 
+                  selling_price = excluded.selling_price, 
+                  cost_price = excluded.cost_price, 
+                  discount_price = excluded.discount_price, 
+                  discount_start = excluded.discount_start, 
+                  discount_end = excluded.discount_end,
+                  custom_image_url = excluded.custom_image_url`,
+            args: [
+                company_id, original_price, 
+                selling_price || null, 
+                cost_price || null, 
+                discount_price || null, 
+                discount_start || null, 
+                discount_end || null,
+                custom_image_url || null
+            ]
+        });
+
+        // Invalidate game list cache so updated price/image is immediately visible
+        invalidate("wepay:game_list");
+        invalidate("wepay:cashcard_list");
+
+        res.json({ success: true, message: "บันทึกการตั้งค่าราคาแล้ว" });
+    } catch (err) {
+        console.error("❌ Product Override Error:", err);
         res.status(500).json({ success: false, message: err.message });
     }
 });
