@@ -351,8 +351,7 @@ router.post("/", async (req, res) => {
                 await updateBalance(req.user.id, -finalAmount, `จ่าย: ${gameDisplayName} [${productId}]${usePoints ? ' (ใช้แต้ม)' : ''}`);
                 
                 if (usedPointsCount > 0) {
-                    await supabase.rpc('decrement_points', { user_id: req.user.id, amount: usedPointsCount });
-                    // If RPC not exists, use standard update
+                    // Using standard update instead of RPC to avoid "function not found" errors
                     const { error: pErr } = await supabase.from("users").update({ points: 0 }).eq("id", req.user.id);
                     if (pErr) console.error("❌ Point Deduction Error:", pErr);
                 }
