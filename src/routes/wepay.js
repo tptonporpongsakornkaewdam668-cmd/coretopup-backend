@@ -231,7 +231,7 @@ router.post("/", async (req, res) => {
                 productId = productId || payload?.productId || payload?.company_id || payload?.id;
 
                 if (!reference) {
-                    reference = `WP-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+                    reference = `G${Date.now().toString().slice(-10)}${Math.random().toString(36).substring(2, 7)}`.toUpperCase();
                 }
 
                 currentStep = "validating_payload";
@@ -355,12 +355,17 @@ router.post("/", async (req, res) => {
                 // 🚀 5. ส่งคำสั่งไป wePAY
                 currentStep = "calling_wepay_api";
                 const baseUrl = process.env.WEPAY_CALLBACK_URL || "https://api.coinzonetopup.shop/api/wepay-game/callback";
+                
+                // 🎰 บังคับเจน Reference ใหม่ให้สั้น (ไม่เกิน 20 หลัก) ตามกฎ wePAY เสมอ
+                const safeReference = `G${Date.now().toString().slice(-10)}${Math.random().toString(36).substring(2, 7)}`.toUpperCase();
+                console.log(`📡 [WePay API] Using Safe Reference: ${safeReference}`);
+
                 const wepayBody = {
                     type: payload.type || "gtopup",
                     pay_to_company: productId,
                     pay_to_amount: String(basePrice),
                     pay_to_ref1: String(playerId),
-                    dest_ref: reference,
+                    dest_ref: safeReference,
                     resp_url: baseUrl.includes("callback") ? baseUrl : `${baseUrl}/callback`
                 };
 
@@ -369,18 +374,25 @@ router.post("/", async (req, res) => {
                 }
 
                 const result = await wepayRequest(wepayBody);
+                
+                console.log(`📥 [WePay] API Status: ${result.statusCode}`);
+                console.log(`📥 [WePay] API Result:`, result.data);
 
-                // 🛑 กรณี wePAY ตอบกลับว่า "ล้มเหลว" ทันที -> คืนเงินให้ผู้ใช้
-                if (result.statusCode !== 200) {
-                    console.error("❌ wePAY Error (Refunding):", result.data);
-                    await updateBalance(req.user.id, finalAmount, `คืนเงินอัตโนมัติ (wePAY Error): ${reference}`);
+                // ตรวจสอบความสำเร็จ (wePAY คืนค่า code เป็น "00000" และมี bill_id หรือ transaction_id)
+                const isSuccess = result.data && (result.data.code === "00000" || result.data.success === true || String(result.data.success) === "true");
+                const wepayOrderId = result.data?.bill_id || result.data?.transaction_id || result.data?.order_id || result.data?.orderid;
+
+                // 🛑 กรณี wePAY ตอบกลับว่า "ล้มเหลว" หรือไม่มีรหัสสั่งซื้อ -> คืนเงินให้ผู้ใช้
+                if (result.statusCode !== 200 || !isSuccess || !wepayOrderId) {
+                    console.error("❌ wePAY API Failed (Refunding)... Result:", result.data);
+                    await updateBalance(req.user.id, finalAmount, `คืนเงินอัตโนมัติ (wePAY Failed): ${safeReference}`);
                     if (usedPointsCount > 0) {
                         await db.execute({ sql: "UPDATE users SET points = ? WHERE id = ?", args: [usedPointsCount, req.user.id] });
                     }
-                    return res.status(result.statusCode).json({
+                    return res.status(result.statusCode === 200 ? 400 : result.statusCode).json({
                         success: false,
-                        message: "ไม่สามารถส่งคำสั่งซื้อไปยัง wePAY ได้ ระบบคืนเงินให้แล้ว",
-                        details: result.data || "wePAY API error"
+                        message: "การสั่งซื้อล้มเหลว ระบบคืนเงินให้แล้ว",
+                        details: result.data || "error"
                     });
                 }
 
@@ -399,12 +411,12 @@ router.post("/", async (req, res) => {
                         server || "-", 
                         finalAmount, 
                         "processing",
-                        reference,
+                        safeReference, // เลข Reference 16 หลักที่เราส่งให้ wePAY (เก็บใน transaction_id)
                         "wepay"
                     ]
                 });
 
-                return res.json({ statusCode: 200, success: true, message: "สั่งซื้อสำเร็จ กำลังประมวลผล...", data: result.data });
+                return res.json({ success: true, message: "สั่งซื้อสำเร็จ กำลังประมวลผล...", orderId, reference: safeReference });
 
             } catch (error) {
                 console.error(`❌ wePAY Purchase Error at [${currentStep}]:`, error);
@@ -412,7 +424,7 @@ router.post("/", async (req, res) => {
                 // 💸 ถ้าพังหลังจากหักเงิน -> พยายามคืนเงิน
                 if (currentStep === "calling_wepay_api" || currentStep === "saving_order_to_db") {
                     try {
-                        await updateBalance(req.user.id, finalAmount, "คืนเงินอัตโนมัติ (System Error)");
+                        await updateBalance(req.user.id, finalAmount, "คืนเงินอัตโนมัติ (ระบบขัดข้อง)");
                         console.log("💰 Auto-refunded successful.");
                     } catch (e) {
                         console.error("🔥 CRITICAL: FAILED TO REFUND!", e);

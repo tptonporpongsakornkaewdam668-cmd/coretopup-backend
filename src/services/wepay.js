@@ -12,6 +12,11 @@ const md5 = (str) => crypto.createHash("md5").update(str).digest("hex");
  * Proxy Request to wePAY API (via VPS)
  */
 async function wepayRequest(payload) {
+    if (!WEPAY_USERNAME || !WEPAY_PASSWORD) {
+        console.error("❌ [WePayService] WEPAY_USERNAME or WEPAY_PASSWORD is missing in ENV!");
+        return { statusCode: 500, data: { status: "error", message: "System configuration error (Env vars missing)" } };
+    }
+
     const password_hash = md5(WEPAY_PASSWORD);
     const body = {
         username: WEPAY_USERNAME,
@@ -19,14 +24,9 @@ async function wepayRequest(payload) {
         ...payload
     };
 
-    const headers = { "Content-Type": "application/x-www-form-urlencoded" };
+    const headers = { "Content-Type": "application/json" };
     
-    // แปลง Body เป็น Form Data String
-    const formBody = Object.keys(body)
-        .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(body[key]))
-        .join('&');
-
-    return proxyRequest(WEPAY_API_URL, "POST", headers, formBody);
+    return proxyRequest(WEPAY_API_URL, "POST", headers, body);
 }
 
 /**
