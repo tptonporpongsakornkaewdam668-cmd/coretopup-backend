@@ -100,19 +100,63 @@ router.get("/users", authenticateAdmin, async (req, res) => {
     }
 });
 
+// Edit Balance (Add/Subtract)
 router.patch("/users/:id/balance", authenticateAdmin, async (req, res) => {
     try {
-        await db.execute({ sql: "UPDATE users SET balance = ? WHERE id = ?", args: [req.body.balance, req.params.id] });
-        res.json({ success: true, message: "ปรับยอดเงินสำเร็จ" });
+        const { amount, description } = req.body;
+        const newBalance = await updateBalance(req.params.id, parseFloat(amount), description || "Admin Adjustment");
+        res.json({ success: true, message: "ปรับยอดเงินสำเร็จ", newBalance });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 });
 
+// Edit Points (Add/Subtract)
 router.patch("/users/:id/points", authenticateAdmin, async (req, res) => {
     try {
-        await db.execute({ sql: "UPDATE users SET points = ? WHERE id = ?", args: [req.body.points, req.params.id] });
+        const { amount } = req.body;
+        await db.execute({ 
+            sql: "UPDATE users SET points = points + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", 
+            args: [parseInt(amount), req.params.id] 
+        });
         res.json({ success: true, message: "ปรับแต้มสำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Edit User Bio
+router.patch("/users/:id", authenticateAdmin, async (req, res) => {
+    try {
+        const { email, role } = req.body;
+        await db.execute({
+            sql: "UPDATE users SET email = ?, role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            args: [email, role, req.params.id]
+        });
+        res.json({ success: true, message: "อัปเดตข้อมูลผู้ใช้สำเร็จ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Get Individual User History
+router.get("/users/:id/history", authenticateAdmin, async (req, res) => {
+    try {
+        const orders = await db.execute({
+            sql: "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
+            args: [req.params.id]
+        });
+        const topups = await db.execute({
+            sql: "SELECT * FROM topups WHERE user_id = ? ORDER BY created_at DESC",
+            args: [req.params.id]
+        });
+        res.json({ 
+            success: true, 
+            data: {
+                orders: orders.rows,
+                topups: topups.rows
+            } 
+        });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
