@@ -15,16 +15,16 @@ router.get("/", authenticate, async (req, res) => {
             args: [req.user.id]
         });
 
-        // 2. ดึงประวัติการเติมเงิน (Top-ups) - ตารางนี้อาจจะยังไม่มี ขอกึ่งๆ ไว้ก่อน
+        // 2. ดึงประวัติการเติมเงิน (Top-ups) จากตาราง topups
         let topups = [];
         try {
             const topupsRes = await db.execute({
-                sql: "SELECT * FROM history WHERE user_id = ? AND type = 'topup' ORDER BY created_at DESC",
+                sql: "SELECT * FROM topups WHERE user_id = ? ORDER BY created_at DESC",
                 args: [req.user.id]
             });
             topups = topupsRes.rows;
         } catch (e) {
-            console.warn("⚠️ History table or topup type not ready, returning empty.");
+            console.warn("⚠️ Topups table not ready or empty.");
         }
 
         const historyObj = {
