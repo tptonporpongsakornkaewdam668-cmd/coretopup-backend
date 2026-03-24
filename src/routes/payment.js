@@ -36,6 +36,18 @@ router.post("/verify-slip-image", authenticate, upload.single("file"), async (re
     }
 
     try {
+        // Ensure table exists BEFORE any checks
+        await db.execute(`CREATE TABLE IF NOT EXISTS topups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            user_id TEXT, 
+            amount DECIMAL, 
+            trans_ref TEXT UNIQUE, 
+            sender_name TEXT, 
+            sender_bank TEXT, 
+            status TEXT, 
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+
         const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
         const finalUrl = getSlip2GoUrl("/api/verify-slip/qr-base64/info");
 
@@ -146,18 +158,6 @@ router.post("/verify-slip-image", authenticate, upload.single("file"), async (re
             return res.status(400).json({ success: false, message: "สลิปนี้เคยถูกใช้งานไปแล้ว" });
         }
 
-        // บันทึกรายการลงตาราง topups (สร้างตารางถ้าไม่มี)
-        await db.execute(`CREATE TABLE IF NOT EXISTS topups (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            user_id TEXT, 
-            amount DECIMAL, 
-            trans_ref TEXT UNIQUE, 
-            sender_name TEXT, 
-            sender_bank TEXT, 
-            status TEXT, 
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )`);
-
         await db.execute({
             sql: "INSERT INTO topups (user_id, amount, trans_ref, sender_name, sender_bank, status) VALUES (?, ?, ?, ?, ?, ?)",
             args: [
@@ -208,6 +208,18 @@ router.post("/verify-slip", authenticate, async (req, res) => {
     }
 
     try {
+        // Ensure table exists BEFORE any checks
+        await db.execute(`CREATE TABLE IF NOT EXISTS topups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            user_id TEXT, 
+            amount DECIMAL, 
+            trans_ref TEXT UNIQUE, 
+            sender_name TEXT, 
+            sender_bank TEXT, 
+            status TEXT, 
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+
         // 1. ส่งข้อมูลไปตรวจสอบที่ Slip2Go API
         const finalUrl = getSlip2GoUrl("/api/verify-slip/qr-code/info");
         console.log("🔍 [Payment] กำลังตรวจสอบ Slip ผ่าน Slip2Go (qr-code)...");

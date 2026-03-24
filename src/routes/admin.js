@@ -294,6 +294,44 @@ router.delete("/discounts/:id", authenticateAdmin, async (req, res) => {
 
 
 // ─── Admin Management ───
+// GET /api/admin/topups - List all topup history with filters
+router.get("/topups", authenticateAdmin, async (req, res) => {
+    const { search, startDate, endDate } = req.query;
+
+    try {
+        let sql = `
+            SELECT t.*, u.email as user_email 
+            FROM topups t 
+            LEFT JOIN users u ON t.user_id = u.id 
+            WHERE 1=1
+        `;
+        const args = [];
+
+        if (search) {
+            sql += ` AND (u.email LIKE ? OR t.trans_ref LIKE ? OR t.sender_name LIKE ?)`;
+            args.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        if (startDate) {
+            sql += ` AND t.created_at >= ?`;
+            args.push(startDate + " 00:00:00");
+        }
+
+        if (endDate) {
+            sql += ` AND t.created_at <= ?`;
+            args.push(endDate + " 23:59:59");
+        }
+
+        sql += ` ORDER BY t.created_at DESC LIMIT 200`;
+
+        const { rows } = await db.execute({ sql, args });
+        res.json({ success: true, topups: rows });
+    } catch (err) {
+        console.error("❌ List Topups Error:", err);
+        res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการดึงข้อมูลการเติมเงิน" });
+    }
+});
+
 // GET /api/admin/admins - List all accounts with admin role
 router.get("/admins", authenticateAdmin, async (req, res) => {
     try {
