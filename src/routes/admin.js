@@ -6,6 +6,7 @@ const { adminLoginRules } = require("../middleware/validate");
 const { adminLimiter } = require("../middleware/rateLimiter");
 const { db } = require("../db");
 const { invalidate } = require("../services/cache");
+const { updateBalance } = require("../services/wallet");
 const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
 
