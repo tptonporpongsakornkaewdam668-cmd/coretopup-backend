@@ -17,8 +17,64 @@ router.get("/user/inquiry", authenticate, async (req, res) => {
 
 // 2. ดึงรายการแอพพรีเมียม - cached
 router.get("/app-premium", async (req, res) => {
-    const result = await getCached("peamsub:app-premium", () => peamsubRequest("/v2/app-premium"), CACHE_TTL);
-    res.status(result.statusCode).json(result.data);
+    try {
+        const result = await getCached("peamsub:app-premium", () => peamsubRequest("/v2/app-premium"), CACHE_TTL);
+        if (result.statusCode !== 200) return res.status(result.statusCode).json(result.data);
+
+        const apps = result.data.data || [];
+        const { rows: overrides } = await db.execute("SELECT * FROM product_overrides");
+        const overrideMap = {};
+        
+        console.log(`🔍 [Peamsub] Total Overrides in DB: ${overrides?.length || 0}`);
+        overrides?.forEach(o => { 
+            // Normalize ID and price key
+            const priceKey = Number(o.original_price).toFixed(2);
+            const key = `${o.company_id.toString().trim()}_${priceKey}`;
+            overrideMap[key] = o; 
+            console.log(`   - Map Key Saved: ${key} -> ${o.selling_price}`);
+        });
+
+        const now = new Date();
+        const formatted = apps.map(app => {
+            const basePrice = Number(app.price || 0);
+            let finalPrice = basePrice;
+            let isDiscounted = false;
+            
+            // Normalize current product key
+            const currentPriceKey = basePrice.toFixed(2);
+            const appId = app.id.toString().trim();
+            const key = `${appId}_${currentPriceKey}`;
+            
+            const override = overrideMap[key] || overrideMap[`peamsub_${key}`];
+            
+            if (override) {
+                console.log(`🎯 [Peamsub] MATCH FOUND! App ${appId}: ${currentPriceKey} -> ${override.selling_price}`);
+                finalPrice = Number(override.selling_price || basePrice);
+                
+                if (override.discount_price && override.discount_start && override.discount_end) {
+                    const start = new Date(override.discount_start);
+                    const end = new Date(override.discount_end);
+                    if (now >= start && now <= end) {
+                        finalPrice = Number(override.discount_price);
+                        isDiscounted = true;
+                    }
+                }
+            }
+
+            return {
+                ...app,
+                price: finalPrice,
+                base_price: basePrice,
+                override_data: override || null,
+                is_discount: isDiscounted
+            };
+        });
+
+        res.status(200).json({ success: true, data: formatted });
+    } catch (err) {
+        console.error("❌ Peamsub App List Error:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // 3. ดึงรายการเติมเกม - cached
@@ -43,21 +99,62 @@ router.get("/mobile", async (req, res) => {
  * การซื้อสินค้า (POST) - ต้องล็อกอินและตรวจสอบยอดเงินใน Turso
  */
 router.post("/purchase", authenticate, async (req, res) => {
-    const { type, id, reference, payload, packageName, packagePrice } = req.body;
-
-    if (packagePrice === undefined || packagePrice === null || isNaN(packagePrice)) {
-        return res.status(400).json({ success: false, message: "ราคาไม่ถูกต้อง" });
-    }
+    const { type, id, reference, payload, packageName, packagePrice: priceInBody } = req.body;
 
     try {
+        // 1. ตรวจสอบข้อมูลเบื้องต้น
+        if (!id || !type) {
+            return res.status(400).json({ success: false, message: "ID หรือประเภทสินค้าไม่ถูกต้อง" });
+        }
+
+        // 2. ดึงข้อมูลการตั้งค่าระบบและ Override ราคา
+        const { rows: sRows } = await db.execute("SELECT * FROM system_settings");
+        const sysConfig = (sRows || []).reduce((acc, curr) => { acc[curr.key] = curr.value; return acc; }, {});
+
+        // เราต้องการราคาที่เป็นจริงจาก Peamsub ก่อน (จาก Cache)
+        let basePrice = 0;
+        if (type === "premium") {
+            const appsRes = await getCached("peamsub:app-premium", () => peamsubRequest("/v2/app-premium"), CACHE_TTL);
+            const app = (appsRes.data.data || []).find(a => a.id == id);
+            if (app) basePrice = parseFloat(app.price);
+        } else {
+            // กรณีอื่นๆ ใช้ราคาที่ส่งมา (อาจต้องเพิ่มการดึงราคาจริงในอนาคตเพื่อความปลอดภัยสูงสุด)
+            basePrice = parseFloat(priceInBody);
+        }
+
+        if (isNaN(basePrice)) return res.status(400).json({ success: false, message: "ราคาสินค้าไม่ถูกต้อง" });
+
+        // 3. ตรวจสอบการ Override ราคา
+        const { rows: ovRows } = await db.execute({
+            sql: "SELECT * FROM product_overrides WHERE company_id = ? AND original_price = ? LIMIT 1",
+            args: [id.toString(), basePrice]
+        });
+        const override = ovRows[0];
+        
+        let finalPrice = basePrice;
+        const now = new Date();
+
+        if (override) {
+            finalPrice = parseFloat(override.selling_price || basePrice);
+            if (override.discount_price && override.discount_start && override.discount_end) {
+                const start = new Date(override.discount_start);
+                const end = new Date(override.discount_end);
+                if (now >= start && now <= end) {
+                    finalPrice = parseFloat(override.discount_price);
+                }
+            }
+        }
+
+        // 4. ตรวจสอบยอดเงิน
         const currentBalance = await getBalance(req.user.id);
-        if (currentBalance < packagePrice) {
+        if (currentBalance < finalPrice) {
             return res.status(400).json({
                 success: false,
-                message: `ยอดเงินไม่เพียงพอ (คงเหลือ: ${currentBalance.toFixed(2)} บาท, ราคาสินค้า: ${packagePrice} บาท)`
+                message: `ยอดเงินไม่เพียงพอ (คงเหลือ: ${currentBalance.toFixed(2)} บาท, ราคาสินค้า: ${finalPrice} บาท)`
             });
         }
 
+        // 5. ทำรายการที่ Peamsub
         let endpoint = "";
         if (type === "premium") endpoint = "/v2/app-premium";
         else if (type === "game") endpoint = "/v2/game";
@@ -70,10 +167,18 @@ router.post("/purchase", authenticate, async (req, res) => {
         const peamsubSuccess = result.data?.statusCode === 200;
 
         if (peamsubSuccess) {
-            await updateBalance(req.user.id, -packagePrice, `ซื้อสินค้า Peamsub ${type}: ${packageName || id}`);
+            // หักเงินตามเวลาจริง (finalPrice)
+            await updateBalance(req.user.id, -finalPrice, `ซื้อ Peamsub ${type}: ${packageName || id}`);
+
+            // คำนวณแต้มสะสม
+            const earnThreshold = parseFloat(sysConfig.point_earn_threshold || 100);
+            const earnRate = parseFloat(sysConfig.point_earn_rate || 1);
+            const earnedPoints = Math.floor(finalPrice / earnThreshold) * earnRate;
+            if (earnedPoints > 0) {
+                await db.execute({ sql: "UPDATE users SET points = points + ? WHERE id = ?", args: [earnedPoints, req.user.id] });
+            }
 
             const orderId = uuidv4();
-            // Extract product delivery data (card codes, credentials, etc.)
             const productData = result.data?.data?.product_data 
                 || result.data?.data?.card 
                 || result.data?.data?.code
@@ -89,7 +194,7 @@ router.post("/purchase", authenticate, async (req, res) => {
                     req.user.email || "user@example.com",
                     id.toString(),
                     packageName || id.toString(),
-                    Number(packagePrice),
+                    finalPrice,
                     payload?.playerId || payload?.uid || payload?.number || "-",
                     payload?.server || "-",
                     "success",

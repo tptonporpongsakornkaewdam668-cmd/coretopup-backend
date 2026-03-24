@@ -21,22 +21,44 @@ router.post("/login", adminLimiter, adminLoginRules, async (req, res) => {
     const adminEmail = process.env.ADMIN_EMAIL;
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-    if (email !== adminEmail) {
+    let user = null;
+    let isEnvAdmin = false;
+
+    // 1. Check if it's the fixed env admin
+    if (email === adminEmail) {
+        isEnvAdmin = true;
+        user = { id: "admin", email: adminEmail, role: "admin", password: adminPasswordHash };
+    } else {
+        // 2. Check the database for a user with the 'admin' role
+        try {
+            const { rows } = await db.execute({
+                sql: "SELECT * FROM users WHERE email = ? AND role = 'admin' LIMIT 1",
+                args: [email]
+            });
+            if (rows.length > 0) {
+                user = rows[0];
+            }
+        } catch (err) {
+            console.error("❌ Admin Login DB Error:", err);
+        }
+    }
+
+    if (!user) {
         return res.status(401).json({ success: false, message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" });
     }
 
-    const isMatch = await bcrypt.compare(password, adminPasswordHash);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
         return res.status(401).json({ success: false, message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" });
     }
 
     const token = jwt.sign(
-        { id: "admin", email: adminEmail, role: "admin" },
+        { id: user.id, email: user.email, role: "admin" },
         process.env.ADMIN_JWT_SECRET,
         { expiresIn: "4h" }
     );
 
-    res.json({ success: true, message: "เข้าสู่ระบบ Admin สำเร็จ", token, admin: { email: adminEmail, role: "admin" } });
+    res.json({ success: true, message: "เข้าสู่ระบบ Admin สำเร็จ", token, admin: { email: user.email, role: "admin" } });
 });
 
 router.get("/verify", authenticateAdmin, (req, res) => {
@@ -218,6 +240,7 @@ router.patch("/products/override", authenticateAdmin, async (req, res) => {
         } = req.body;
 
         if (!company_id || original_price === undefined) {
+            console.warn("⚠️ Invalid Product Override Data:", req.body);
             return res.status(400).json({ success: false, message: "Missing company_id or original_price" });
         }
 
@@ -244,9 +267,13 @@ router.patch("/products/override", authenticateAdmin, async (req, res) => {
             ]
         });
 
-        // Invalidate game list cache so updated price/image is immediately visible
+        // Invalidate cache so updated price/image is immediately visible
         invalidate("wepay:game_list");
         invalidate("wepay:cashcard_list");
+        invalidate("peamsub:app-premium");
+        invalidate("peamsub:game");
+        invalidate("peamsub:cashcard");
+        invalidate("peamsub:mobile");
 
         res.json({ success: true, message: "บันทึกการตั้งค่าราคาแล้ว" });
     } catch (err) {
@@ -261,6 +288,66 @@ router.delete("/discounts/:id", authenticateAdmin, async (req, res) => {
         res.json({ success: true, message: "ลบโค้ดสำเร็จ" });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+
+// ─── Admin Management ───
+// GET /api/admin/admins - List all accounts with admin role
+router.get("/admins", authenticateAdmin, async (req, res) => {
+    try {
+        const { rows } = await db.execute("SELECT id, email, created_at, role FROM users WHERE role = 'admin'");
+        res.json({ success: true, admins: rows });
+    } catch (err) {
+        console.error("❌ List Admins Error:", err);
+        res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการดึงรายชื่อ Admin" });
+    }
+});
+
+// POST /api/admin/create-admin - Create a new admin account in users table
+router.post("/create-admin", authenticateAdmin, async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ success: false, message: "กรุณาระบุอีเมลและรหัสผ่าน" });
+    }
+
+    try {
+        // Check if exists
+        const check = await db.execute({ 
+            sql: "SELECT email FROM users WHERE email = ? LIMIT 1", 
+            args: [email] 
+        });
+        
+        if (check.rows.length > 0) {
+            return res.status(409).json({ success: false, message: "อีเมลนี้มีอยู่ในระบบแล้ว" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 12);
+        const id = uuidv4();
+        
+        await db.execute({
+            sql: "INSERT INTO users (id, email, password, role) VALUES (?, ?, ?, ?)",
+            args: [id, email, hashedPassword, "admin"]
+        });
+
+        res.status(201).json({ success: true, message: "สร้างบัญชี Admin ใหม่สำเร็จ" });
+    } catch (err) {
+        console.error("❌ Create Admin Error:", err);
+        res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการสร้าง Admin" });
+    }
+});
+
+// DELETE /api/admin/admins/:id - Delete an admin account
+router.delete("/admins/:id", authenticateAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Prevent deleting the main admin if necessary? We'll allow it for now except by ID if it's the fixed one
+        // (The fixed one isn't in users table yet, so this is safe)
+        await db.execute({ sql: "DELETE FROM users WHERE id = ? AND role = 'admin'", args: [id] });
+        res.json({ success: true, message: "ลบบัญชี Admin สำเร็จ" });
+    } catch (err) {
+        console.error("❌ Delete Admin Error:", err);
+        res.status(500).json({ success: false, message: "เกิดข้อผิดพลาด" });
     }
 });
 
