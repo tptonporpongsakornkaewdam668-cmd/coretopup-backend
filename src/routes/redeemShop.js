@@ -1,6 +1,6 @@
 const express = require("express");
 const { body, validationResult } = require("express-validator");
-const { generateRedeemCode, processRedeem, initRedeemTables } = require("../services/redeemService");
+const { generateRedeemCode, processRedeem } = require("../services/redeemService");
 const { redeemLimiter, apiLimiter } = require("../middleware/rateLimiter");
 const { authenticateAdmin } = require("../middleware/adminAuth");
 const { authenticate } = require("../middleware/auth");
@@ -8,11 +8,17 @@ const { getBalance, updateBalance } = require("../services/wallet");
 const { db } = require("../db");
 const crypto = require("crypto");
 const { v4: uuidv4 } = require("uuid");
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 
 const router = express.Router();
 
-// Initialize tables on startup
-initRedeemTables().catch(console.error);
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
+
 
 // ─── Middleware: API Key Authentication (for game server calls) ───────────────
 const validateGameApiKey = async (req, res, next) => {
@@ -219,15 +225,29 @@ router.get("/admin/products", authenticateAdmin, async (req, res) => {
 });
 
 // POST /api/redeem-shop/admin/products
-router.post("/admin/products", authenticateAdmin, async (req, res) => {
-    const { name, description, price, item_id, amount, image_url, is_active } = req.body;
+router.post("/admin/products", authenticateAdmin, upload.single("image"), async (req, res) => {
+    let { name, description, price, item_id, amount, image_url, is_active } = req.body;
     if (!name || !price || !item_id || !amount) {
         return res.status(400).json({ success: false, message: "Missing required fields: name, price, item_id, amount" });
     }
+
+    if (req.file) {
+        const ext = path.extname(req.file.originalname) || ".jpg";
+        const filename = `redeem_prod_${Date.now()}_${uuidv4().substring(0, 8)}${ext}`;
+        const uploadDir = path.join(__dirname, "..", "public", "uploads", "products");
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const filePath = path.join(uploadDir, filename);
+        fs.writeFileSync(filePath, req.file.buffer);
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        image_url = `${baseUrl}/uploads/products/${filename}`;
+    }
+
     try {
         await db.execute({
             sql: "INSERT INTO redeem_products (name, description, price, item_id, amount, image_url, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            args: [name, description || null, parseFloat(price), item_id, parseInt(amount), image_url || null, is_active !== false ? 1 : 0]
+            args: [name, description || null, parseFloat(price), item_id, parseInt(amount), image_url || null, is_active !== false && is_active !== 'false' && is_active !== '0' ? 1 : 0]
         });
         res.json({ success: true, message: "Product created successfully" });
     } catch (err) {
@@ -237,8 +257,22 @@ router.post("/admin/products", authenticateAdmin, async (req, res) => {
 });
 
 // PATCH /api/redeem-shop/admin/products/:id
-router.patch("/admin/products/:id", authenticateAdmin, async (req, res) => {
-    const { name, description, price, item_id, amount, image_url, is_active } = req.body;
+router.patch("/admin/products/:id", authenticateAdmin, upload.single("image"), async (req, res) => {
+    let { name, description, price, item_id, amount, image_url, is_active } = req.body;
+    
+    if (req.file) {
+        const ext = path.extname(req.file.originalname) || ".jpg";
+        const filename = `redeem_prod_${Date.now()}_${uuidv4().substring(0, 8)}${ext}`;
+        const uploadDir = path.join(__dirname, "..", "public", "uploads", "products");
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const filePath = path.join(uploadDir, filename);
+        fs.writeFileSync(filePath, req.file.buffer);
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        image_url = `${baseUrl}/uploads/products/${filename}`;
+    }
+
     try {
         await db.execute({
             sql: `UPDATE redeem_products 
@@ -251,7 +285,16 @@ router.patch("/admin/products/:id", authenticateAdmin, async (req, res) => {
                       is_active = COALESCE(?, is_active),
                       updated_at = CURRENT_TIMESTAMP
                   WHERE id = ?`,
-            args: [name || null, description || null, price ? parseFloat(price) : null, item_id || null, amount ? parseInt(amount) : null, image_url || null, is_active !== undefined ? (is_active ? 1 : 0) : null, req.params.id]
+            args: [
+                name || null, 
+                description || null, 
+                price ? parseFloat(price) : null, 
+                item_id || null, 
+                amount ? parseInt(amount) : null, 
+                image_url || null, 
+                is_active !== undefined ? (is_active !== false && is_active !== 'false' && is_active !== '0' ? 1 : 0) : null, 
+                req.params.id
+            ]
         });
         res.json({ success: true, message: "Product updated successfully" });
     } catch (err) {

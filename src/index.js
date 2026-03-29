@@ -17,6 +17,7 @@ const wepayRoutes = require("./routes/wepay");
 const slidersRoutes = require("./routes/sliders");
 const discountsRoutes = require("./routes/discounts");
 const redeemShopRoutes = require("./routes/redeemShop");
+const { initAllTables } = require("./services/initDb");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -25,6 +26,7 @@ app.use(
   helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
   })
 );
 
@@ -94,6 +96,9 @@ app.get("/admin/*", (req, res) => {
   res.sendFile(path.join(adminPath, "index.html"));
 });
 
+// Serve File Uploads
+app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
+
 // Base API route
 app.get("/", (req, res) => {
   res.json({
@@ -116,8 +121,13 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`\n🚀 Backend running on port ${PORT}`);
+  try {
+    await initAllTables();
+  } catch (err) {
+    console.error("❌ DB init failed:", err.message);
+  }
 });
 
 module.exports = app;

@@ -9,6 +9,8 @@ const { invalidate } = require("../services/cache");
 const { updateBalance } = require("../services/wallet");
 const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 
 const router = express.Router();
 
@@ -234,15 +236,37 @@ router.get("/sliders", authenticateAdmin, async (req, res) => {
     }
 });
 
-router.post("/sliders", authenticateAdmin, async (req, res) => {
+router.post("/sliders", authenticateAdmin, upload.single("image"), async (req, res) => {
     try {
-        const { image_url, link_url, order_index } = req.body;
+        let { image_url, link_url, order_index } = req.body;
+        
+        if (req.file) {
+            const ext = path.extname(req.file.originalname) || ".jpg";
+            const filename = `slider_${Date.now()}_${uuidv4().substring(0, 8)}${ext}`;
+            const uploadDir = path.join(__dirname, "..", "public", "uploads", "sliders");
+            
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            
+            const filePath = path.join(uploadDir, filename);
+            fs.writeFileSync(filePath, req.file.buffer);
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            image_url = `${baseUrl}/uploads/sliders/${filename}`;
+        }
+
+        if (!image_url) {
+            return res.status(400).json({ success: false, message: "กรุณาระบุ URL หรืออัพโหลดรูปภาพ" });
+        }
+
         await db.execute({
             sql: "INSERT INTO sliders (image_url, link_url, order_index) VALUES (?, ?, ?)",
-            args: [image_url, link_url, order_index || 0]
+            args: [image_url, link_url || "", order_index || 0]
         });
+        invalidate("sliders:all");
         res.json({ success: true, message: "เพิ่มสไลเดอร์สำเร็จ" });
     } catch (err) {
+        console.error("❌ Add Slider Error:", err);
         res.status(500).json({ success: false, message: err.message });
     }
 });
@@ -250,6 +274,7 @@ router.post("/sliders", authenticateAdmin, async (req, res) => {
 router.delete("/sliders/:id", authenticateAdmin, async (req, res) => {
     try {
         await db.execute({ sql: "DELETE FROM sliders WHERE id = ?", args: [req.params.id] });
+        invalidate("sliders:all");
         res.json({ success: true, message: "ลบสไลเดอร์สำเร็จ" });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -289,9 +314,9 @@ router.get("/game-settings", authenticateAdmin, async (req, res) => {
     }
 });
 
-router.patch("/products/override", authenticateAdmin, async (req, res) => {
+router.patch("/products/override", authenticateAdmin, upload.single("image"), async (req, res) => {
     try {
-        const { 
+        let { 
             company_id, 
             original_price, 
             selling_price, 
@@ -301,6 +326,21 @@ router.patch("/products/override", authenticateAdmin, async (req, res) => {
             discount_end,
             custom_image_url
         } = req.body;
+
+        if (req.file) {
+            const ext = path.extname(req.file.originalname) || ".jpg";
+            const filename = `product_${company_id}_${original_price}_${Date.now()}${ext}`;
+            const uploadDir = path.join(__dirname, "..", "public", "uploads", "products");
+            
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            
+            const filePath = path.join(uploadDir, filename);
+            fs.writeFileSync(filePath, req.file.buffer);
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            custom_image_url = `${baseUrl}/uploads/products/${filename}`;
+        }
 
         if (!company_id || original_price === undefined) {
             console.warn("⚠️ Invalid Product Override Data:", req.body);
