@@ -35,7 +35,10 @@ const devOrigins = [
   "http://localhost:3000",
   "http://localhost:5000",
   "http://localhost:8080",
-  "https://coinzonetopup.pages.dev",
+  "http://coretopup.com",
+  "https://coretopup.com",
+  "http://www.coretopup.com",
+  "https://www.coretopup.com",
   "https://coretopup.pages.dev",
   "https://www.coretopup.shop",
   "https://coretopup.shop"
