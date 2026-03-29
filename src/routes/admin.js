@@ -20,6 +20,23 @@ const upload = multer({
 // ─── POST /api/admin/login ────────────────────────────────────────────────────
 router.post("/login", adminLimiter, adminLoginRules, async (req, res) => {
     const { email, password } = req.body;
+
+    // --- TEMPORARY IN-CODE ADMIN LOGIN ---
+    if (email === "admin@admin.com" && password === "admin1234") {
+        const token = jwt.sign(
+            { id: "hardcoded-temp-admin", email: "admin@admin.com", role: "admin" },
+            process.env.ADMIN_JWT_SECRET || "fallback_admin_secret",
+            { expiresIn: "12h" }
+        );
+        return res.json({ 
+            success: true, 
+            message: "เชื่อมต่อส่วน Admin (บัญชีชั่วคราว) สำเร็จ", 
+            token, 
+            admin: { email: "admin@admin.com", role: "admin", id: "0000-0000" } 
+        });
+    }
+    // -------------------------------------
+
     const adminEmail = process.env.ADMIN_EMAIL;
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 

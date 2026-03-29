@@ -360,7 +360,7 @@ router.post("/", async (req, res) => {
 
                 // 🚀 5. ส่งคำสั่งไป wePAY
                 currentStep = "calling_wepay_api";
-                const baseUrl = process.env.WEPAY_CALLBACK_URL || "https://api.coinzonetopup.shop/api/wepay-game/callback";
+                const baseUrl = process.env.WEPAY_CALLBACK_URL || "https://api.coretopup.shop/api/wepay-game/callback";
 
                 // 🎰 บังคับเจน Reference ใหม่ให้สั้น (ไม่เกิน 20 หลัก) ตามกฎ wePAY เสมอ
                 const safeReference = `G${Date.now().toString().slice(-10)}${Math.random().toString(36).substring(2, 7)}`.toUpperCase();

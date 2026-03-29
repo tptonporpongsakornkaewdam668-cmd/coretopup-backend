@@ -16,6 +16,7 @@ const historyRoutes = require("./routes/history");
 const wepayRoutes = require("./routes/wepay");
 const slidersRoutes = require("./routes/sliders");
 const discountsRoutes = require("./routes/discounts");
+const redeemShopRoutes = require("./routes/redeemShop");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -33,8 +34,9 @@ const devOrigins = [
   "http://localhost:5000",
   "http://localhost:8080",
   "https://coinzonetopup.pages.dev",
-  "https://www.coinzonetopup.shop",
-  "https://coinzonetopup.shop"
+  "https://coretopup.pages.dev",
+  "https://www.coretopup.shop",
+  "https://coretopup.shop"
 ];
 const envOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(o => o.trim()).filter(o => o.length > 0);
 const allowedOrigins = Array.from(new Set([...devOrigins, ...envOrigins]));
@@ -42,7 +44,7 @@ const allowedOrigins = Array.from(new Set([...devOrigins, ...envOrigins]));
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || origin === "null") {
         callback(null, true);
       } else {
         console.warn(`⚠️ CORS Blocked: ${origin}`); // Log ดูว่าตัวไหนโดนบล็อก
@@ -50,8 +52,8 @@ app.use(
       }
     },
     credentials: true,
-    methods: ["GET", "POST", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
   })
 );
 
@@ -65,7 +67,7 @@ app.disable("x-powered-by");
 app.get("/api", (req, res) => {
   res.json({
     success: true,
-    message: "🎮 CoinZoneTopup API is ready!",
+    message: "🎮 CoreTopup API is ready!",
     env: process.env.NODE_ENV
   });
 });
@@ -81,6 +83,7 @@ app.use("/api/history", historyRoutes);
 app.use("/api/wepay-game", wepayRoutes);
 app.use("/api/sliders", slidersRoutes);
 app.use("/api/discounts", discountsRoutes);
+app.use("/api/redeem-shop", redeemShopRoutes);
 
 // Serve Static Admin Panel
 const adminPath = path.join(__dirname, "public", "admin");
@@ -94,7 +97,7 @@ app.get("/admin/*", (req, res) => {
 // Base API route
 app.get("/", (req, res) => {
   res.json({
-    message: "🎮 GameTopUp API is running on Render!",
+    message: "🎮 CoreTopup API is running on Render!",
     version: "1.0.0"
   });
 });

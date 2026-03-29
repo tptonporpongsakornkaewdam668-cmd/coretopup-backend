@@ -40,4 +40,14 @@ const adminLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-module.exports = { authLimiter, apiLimiter, orderLimiter, adminLimiter };
+// ─── ป้องกัน API Spam: Redeem ───────────────────────────────────────────────────
+// จำกัด 60 ครั้ง / 1 นาที ต่อ IP
+const redeemLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    message: { success: false, message: "Redeem มากเกินไป กรุณารอสักครู่" },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+module.exports = { authLimiter, apiLimiter, orderLimiter, adminLimiter, redeemLimiter };
