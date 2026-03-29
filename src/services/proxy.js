@@ -1,29 +1,29 @@
 const axios = require("axios");
 
-const VPS_PROXY_URL = "http://157.85.102.141:3002/proxy";
-
 /**
- * Helper to route requests through VPS Proxy if needed
+ * Since this backend is deployed directly on the VPS,
+ * requests made from here will use the VPS's IP (148.72.244.182).
+ * IP to whitelist on wePAY and Peamsub: 148.72.244.182
  */
 async function proxyRequest(targetUrl, method, headers, body) {
     try {
-        console.log(`📡 [ProxyRequest] Forwarding ${method} ${targetUrl} via VPS...`);
+        console.log(`📡 [ProxyRequest] Direct request to ${method} ${targetUrl}`);
 
-        const proxyPayload = {
-            targetUrl,
-            method,
-            headers,
+        const config = {
+            method: method.toLowerCase(),
+            url: targetUrl,
+            headers: headers || {},
         };
 
         if (body) {
-            proxyPayload.body = typeof body === 'object' ? JSON.stringify(body) : body;
+            config.data = typeof body === "object" ? body : JSON.parse(body);
         }
 
-        const response = await axios.post(VPS_PROXY_URL, proxyPayload);
+        const response = await axios(config);
 
         return {
             statusCode: response.status,
-            data: response.data
+            data: response.data,
         };
     } catch (error) {
         const status = error.response?.status || 500;
@@ -31,7 +31,7 @@ async function proxyRequest(targetUrl, method, headers, body) {
         console.error(`❌ [ProxyRequest] Failed:`, data);
         return {
             statusCode: status,
-            data: data
+            data: data,
         };
     }
 }
